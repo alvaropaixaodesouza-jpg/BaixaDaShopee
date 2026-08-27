@@ -16,7 +16,7 @@ import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
-import android.media.ExifInterface;
+import androidx.exifinterface.media.ExifInterface;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;

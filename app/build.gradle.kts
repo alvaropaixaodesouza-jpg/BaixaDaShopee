@@ -33,4 +33,5 @@ android {
 dependencies {
     // Modelo incorporado: fica disponível offline imediatamente após a instalação.
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    implementation("androidx.exifinterface:exifinterface:1.4.1")
 }

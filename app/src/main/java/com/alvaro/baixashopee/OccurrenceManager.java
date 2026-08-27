@@ -34,7 +34,13 @@ public final class OccurrenceManager {
         if (raw == null || raw.isEmpty()) {
             items.addAll(DEFAULTS);
         } else {
-            JSONArray array = new JSONArray(raw);
+            JSONArray array;
+            try {
+                array = new JSONArray(raw);
+            } catch (Exception error) {
+                items.addAll(DEFAULTS);
+                return new ArrayList<>(items);
+            }
             for (int i = 0; i < array.length(); i++) {
                 String value = array.optString(i).trim();
                 if (!value.isEmpty()) items.add(value);
