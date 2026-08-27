@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Baixa da Shopee</string>
+    <string name="keyboard_name">Baixa da Shopee</string>
+    <string name="accessibility_description">Executa, com comando explícito do usuário, os toques e deslizes mapeados no painel assistido.</string>
+</resources>
