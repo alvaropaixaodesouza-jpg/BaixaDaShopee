@@ -5,19 +5,22 @@ import android.app.AlertDialog;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.database.Cursor;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.provider.Settings;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowInsetsController;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ListView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -41,10 +44,13 @@ public class MainActivity extends Activity {
     private HouseStore houseStore;
     private OccurrenceManager occurrenceManager;
     private ProfileManager profileManager;
-    private DeliveryAdapter adapter;
     private TextView summaryText;
     private TextView currentDeliveryText;
+    private TextView overlayPermissionChip;
+    private TextView accessibilityPermissionChip;
+    private TextView deliverySectionTitle;
     private EditText receiverNameInput;
+    private LinearLayout deliveryContainer;
     private Button packagePhotoButton;
     private Button facadePhotoButton;
     private Button linkHouseButton;
@@ -53,6 +59,8 @@ public class MainActivity extends Activity {
     private ImageView packagePreview;
     private ImageView facadePreview;
     private boolean pendingPackagePhoto;
+    private boolean pendingAutomationSetup;
+    private boolean accessibilityPromptVisible;
     private int selectedIndex;
     private int pendingPhotoIndex = -1;
 
@@ -69,6 +77,10 @@ public class MainActivity extends Activity {
             profileManager = new ProfileManager(this);
             summaryText = findViewById(R.id.summaryText);
             currentDeliveryText = findViewById(R.id.currentDeliveryText);
+            overlayPermissionChip = findViewById(R.id.overlayPermissionChip);
+            accessibilityPermissionChip = findViewById(R.id.accessibilityPermissionChip);
+            deliverySectionTitle = findViewById(R.id.deliverySectionTitle);
+            deliveryContainer = findViewById(R.id.deliveryContainer);
             receiverNameInput = findViewById(R.id.receiverNameInput);
             packagePhotoButton = findViewById(R.id.packagePhotoButton);
             facadePhotoButton = findViewById(R.id.facadePhotoButton);
@@ -77,30 +89,16 @@ public class MainActivity extends Activity {
             generatePdfButton = findViewById(R.id.generatePdfButton);
             packagePreview = findViewById(R.id.packagePreview);
             facadePreview = findViewById(R.id.facadePreview);
-            ListView deliveryList = findViewById(R.id.deliveryList);
 
             receiverNameInput.setText(store.getReceiverName());
             List<Delivery> initial = store.getDeliveries();
             selectedIndex = initial.isEmpty() ? 0 : Math.min(store.getCurrentIndex(), initial.size() - 1);
-            adapter = new DeliveryAdapter(this, this::showDeliveryMenu);
-            deliveryList.setAdapter(adapter);
-            deliveryList.setOnItemClickListener((parent, view, position, id) -> {
-                selectedIndex = position;
-                refresh();
-            });
-
             findViewById(R.id.saveNameButton).setOnClickListener(v -> saveReceiverName());
             findViewById(R.id.importButton).setOnClickListener(v -> chooseSpreadsheet());
-            findViewById(R.id.pasteListButton).setOnClickListener(v -> showPasteDialog());
-            findViewById(R.id.enableKeyboardButton).setOnClickListener(v ->
-                    startActivity(new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)));
-            findViewById(R.id.selectKeyboardButton).setOnClickListener(v -> {
-                InputMethodManager manager = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-                manager.showInputMethodPicker();
-            });
-            findViewById(R.id.houseMemoryButton).setOnClickListener(v -> showHouseMemory());
-            findViewById(R.id.clearRouteButton).setOnClickListener(v -> confirmClearRoute());
-            findViewById(R.id.floatingPanelButton).setOnClickListener(v -> showFloatingPanelControls());
+            findViewById(R.id.moreButton).setOnClickListener(v -> showMoreTools());
+            findViewById(R.id.openPanelButton).setOnClickListener(v -> beginAutomationSetup());
+            overlayPermissionChip.setOnClickListener(v -> beginAutomationSetup());
+            accessibilityPermissionChip.setOnClickListener(v -> beginAutomationSetup());
             findViewById(R.id.scanQrButton).setOnClickListener(v -> scanQrCode());
             packagePhotoButton.setOnClickListener(v -> takePhoto(true));
             facadePhotoButton.setOnClickListener(v -> takePhoto(false));
@@ -132,7 +130,6 @@ public class MainActivity extends Activity {
     private void showStartupRecovery(Throwable error) {
         store = null;
         houseStore = null;
-        adapter = null;
         LinearLayout recovery = new LinearLayout(this);
         recovery.setOrientation(LinearLayout.VERTICAL);
         int pad = (int) (22 * getResources().getDisplayMetrics().density);
@@ -197,7 +194,10 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (store != null) refresh();
+        if (store != null) {
+            refresh();
+            continueAutomationSetupIfNeeded();
+        }
     }
 
     @Override
@@ -257,9 +257,17 @@ public class MainActivity extends Activity {
     }
 
     private void confirmReplacement(List<Delivery> imported) {
+        int named = 0;
+        for (Delivery delivery : imported) {
+            if (!delivery.customerName.trim().isEmpty()
+                    && !"-".equals(delivery.customerName.trim())) named++;
+        }
+        String details = named > 0
+                ? named + " nome(s) reconhecido(s) na coluna Sequence."
+                : "Nenhum nome apareceu na coluna Sequence deste arquivo.";
         new AlertDialog.Builder(this)
                 .setTitle(imported.size() + " entregas encontradas")
-                .setMessage("A rota do dia será substituída. A memória de casas não será apagada; endereços específicos já conhecidos serão vinculados automaticamente.")
+                .setMessage(details + "\n\nA rota do dia será substituída. A memória de casas não será apagada; endereços específicos já conhecidos serão vinculados automaticamente.")
                 .setNegativeButton("Cancelar", (dialog, which) -> refresh())
                 .setPositiveButton("Importar", (dialog, which) -> {
                     store.replaceDeliveries(imported);
@@ -312,53 +320,141 @@ public class MainActivity extends Activity {
                 .show();
     }
 
-    private void showFloatingPanelControls() {
-        String overlayStatus = Settings.canDrawOverlays(this) ? "✓ autorizado" : "○ falta autorizar";
-        String accessibilityStatus = isAutomationAccessibilityEnabled()
-                ? "✓ ativada" : "○ desativada ou bloqueada";
+    private void showMoreTools() {
         new AlertDialog.Builder(this)
-                .setTitle("Clique automático")
-                .setMessage("Sobre outros apps: " + overlayStatus
-                        + "\nAcessibilidade: " + accessibilityStatus
-                        + "\n\nNada será executado antes de você tocar em Play.")
+                .setTitle("Mais ferramentas")
                 .setItems(new String[]{
-                                "1. Autorizar sobre outros aplicativos",
-                                "2. Liberar configurações restritas no Samsung",
-                                "3. Ativar acessibilidade",
-                                "4. Abrir painel e editor de alvos",
-                                "5. Gerenciar predefinições",
-                                "6. Fechar painel"
-                        },
-                        (dialog, which) -> {
-                            if (which == 0) {
-                                Intent permission = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                        Uri.parse("package:" + getPackageName()));
-                                startActivity(permission);
-                            } else if (which == 1) {
-                                showRestrictedSettingsHelp();
-                            } else if (which == 2) {
-                                startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-                            } else if (which == 3) {
-                                if (!Settings.canDrawOverlays(this)) {
-                                    Toast.makeText(this, "Autorize primeiro o painel flutuante", Toast.LENGTH_LONG).show();
-                                    return;
-                                }
-                                startFloatingPanel(profileManager.getActive());
-                            } else if (which == 4) {
-                                startActivity(new Intent(this, AutomationSettingsActivity.class));
-                            } else {
-                                stopService(new Intent(this, FloatingAssistantService.class));
-                            }
-                        })
+                        "Colar códigos",
+                        "Ativar teclado de entregas",
+                        "Escolher teclado",
+                        "Memória de casas",
+                        "Limpar rota atual"
+                }, (dialog, which) -> {
+                    if (which == 0) showPasteDialog();
+                    else if (which == 1) {
+                        startActivity(new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS));
+                    } else if (which == 2) {
+                        InputMethodManager manager =
+                                (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                        manager.showInputMethodPicker();
+                    } else if (which == 3) showHouseMemory();
+                    else confirmClearRoute();
+                })
                 .setNegativeButton("Fechar", null)
                 .show();
+    }
+
+    private void beginAutomationSetup() {
+        pendingAutomationSetup = true;
+        accessibilityPromptVisible = false;
+        if (!Settings.canDrawOverlays(this)) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Primeiro: mostrar o painel")
+                    .setMessage("Na próxima tela, ative “Permitir exibição sobre outros aplicativos” para Baixa da Shopee. Depois o aplicativo continuará para a acessibilidade.")
+                    .setNegativeButton("Agora não", (dialog, which) ->
+                            pendingAutomationSetup = false)
+                    .setPositiveButton("Abrir autorização", (dialog, which) -> {
+                        Intent permission = new Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:" + getPackageName()));
+                        startActivity(permission);
+                    }).show();
+            return;
+        }
+        if (!isAutomationAccessibilityEnabled()) {
+            showAccessibilitySetup();
+            return;
+        }
+        openReadyFloatingPanel();
+    }
+
+    private void continueAutomationSetupIfNeeded() {
+        updatePermissionStatus();
+        if (!pendingAutomationSetup) return;
+        if (!Settings.canDrawOverlays(this)) return;
+        if (!isAutomationAccessibilityEnabled()) {
+            if (!accessibilityPromptVisible) {
+                findViewById(R.id.openPanelButton).postDelayed(
+                        this::showAccessibilitySetup, 350);
+            }
+            return;
+        }
+        openReadyFloatingPanel();
+    }
+
+    private void showAccessibilitySetup() {
+        if (isFinishing() || accessibilityPromptVisible) return;
+        accessibilityPromptVisible = true;
+        new AlertDialog.Builder(this)
+                .setTitle("Segundo: ativar os toques")
+                .setMessage("Vou abrir diretamente o serviço “Baixa da Shopee — Automação”. Ative a chave. Se ela aparecer bloqueada no Samsung, volte e use o botão “Samsung bloqueou”.\n\nO quadrado que pode aparecer na borda é um atalho do Samsung, não é o painel. O painel correto tem Play, +, deslize, − e engrenagem, e só toca depois de você apertar Play.")
+                .setNegativeButton("Agora não", (dialog, which) -> {
+                    accessibilityPromptVisible = false;
+                    pendingAutomationSetup = false;
+                })
+                .setNeutralButton("Samsung bloqueou", (dialog, which) -> {
+                    accessibilityPromptVisible = false;
+                    showRestrictedSettingsHelp();
+                })
+                .setPositiveButton("Abrir acessibilidade", (dialog, which) -> {
+                    accessibilityPromptVisible = false;
+                    openExactAccessibilitySettings();
+                })
+                .setOnDismissListener(dialog -> accessibilityPromptVisible = false)
+                .show();
+    }
+
+    private void openExactAccessibilitySettings() {
+        ComponentName service = new ComponentName(this,
+                AutomationAccessibilityService.class);
+        Intent exact = new Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS");
+        exact.putExtra(Intent.EXTRA_COMPONENT_NAME,
+                service.flattenToString());
+        try {
+            startActivity(exact);
+        } catch (Exception ignored) {
+            startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+        }
+    }
+
+    private void openReadyFloatingPanel() {
+        pendingAutomationSetup = false;
+        accessibilityPromptVisible = false;
+        startFloatingPanel(profileManager.getActive(), true);
+        Toast.makeText(this,
+                "Painel aberto. Adicione os alvos e toque em Play quando estiver pronto.",
+                Toast.LENGTH_LONG).show();
+    }
+
+    private void updatePermissionStatus() {
+        if (overlayPermissionChip == null || accessibilityPermissionChip == null) return;
+        boolean overlay = Settings.canDrawOverlays(this);
+        boolean accessibility = isAutomationAccessibilityEnabled();
+        stylePermissionChip(overlayPermissionChip,
+                overlay ? "✓ Sobreposição" : "○ Sobreposição", overlay);
+        stylePermissionChip(accessibilityPermissionChip,
+                accessibility ? "✓ Acessibilidade" : "○ Acessibilidade",
+                accessibility);
+    }
+
+    private void stylePermissionChip(TextView view, String text, boolean enabled) {
+        view.setText(text);
+        GradientDrawable shape = new GradientDrawable();
+        shape.setCornerRadius(dp(20));
+        shape.setColor(enabled ? Color.rgb(39, 122, 91) : 0x26FFFFFF);
+        shape.setStroke(dp(1), enabled ? 0x77FFFFFF : 0x55FFFFFF);
+        view.setBackground(shape);
+        int horizontal = dp(8);
+        int vertical = dp(7);
+        view.setPadding(horizontal, vertical, horizontal, vertical);
     }
 
     private void showRestrictedSettingsHelp() {
         new AlertDialog.Builder(this)
                 .setTitle("Liberar no Samsung")
-                .setMessage("Na tela de informações do aplicativo, toque nos três pontos no alto e escolha “Permitir configurações restritas”. Depois volte e ative a acessibilidade. Essa autorização só pode ser feita por você.")
-                .setNegativeButton("Cancelar", null)
+                .setMessage("Na tela de informações do aplicativo, toque nos três pontos ⋮ no alto e escolha “Permitir configurações restritas”. Depois volte ao Baixa da Shopee e toque em Painel novamente. Essa confirmação é uma proteção do Android e precisa ser feita por você.")
+                .setNegativeButton("Cancelar", (dialog, which) ->
+                        pendingAutomationSetup = false)
                 .setPositiveButton("Abrir informações do app", (dialog, which) -> {
                     Intent details = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                             Uri.parse("package:" + getPackageName()));
@@ -384,16 +480,12 @@ public class MainActivity extends Activity {
         selectedIndex = position;
         Delivery delivery = deliveries.get(position);
         String occurrenceAction = delivery.hasOccurrence() ? "Alterar ocorrência" : "Colocar em ocorrência";
-        String secondaryAction = delivery.hasOccurrence() ? "Remover ocorrência" : "Editar definições de ocorrência";
-        String[] actions = {
-                "Editar nome e endereço",
-                occurrenceAction,
-                secondaryAction,
-                "Abrir predefinição Baixar",
-                "Abrir predefinição Ocorrência",
-                "Abrir predefinição Tirar de ocorrência",
-                "Excluir desta rota"
-        };
+        List<String> actionList = new ArrayList<>();
+        actionList.add("Editar nome e endereço");
+        actionList.add(occurrenceAction);
+        if (delivery.hasOccurrence()) actionList.add("Remover ocorrência");
+        actionList.add("Excluir desta rota");
+        String[] actions = actionList.toArray(new String[0]);
         new AlertDialog.Builder(this)
                 .setTitle(delivery.trackingCode)
                 .setItems(actions, (dialog, which) -> {
@@ -402,15 +494,7 @@ public class MainActivity extends Activity {
                     else if (which == 2 && delivery.hasOccurrence()) {
                         store.clearOccurrenceAt(position);
                         refresh();
-                    } else if (which == 2) {
-                        startActivity(new Intent(this, AutomationSettingsActivity.class));
-                    } else if (which == 3) {
-                        startProfileForDelivery(position, AutomationProfile.KIND_DOWNLOAD);
-                    } else if (which == 4) {
-                        startProfileForDelivery(position, AutomationProfile.KIND_OCCURRENCE);
-                    } else if (which == 5) {
-                        startProfileForDelivery(position, AutomationProfile.KIND_REMOVE_OCCURRENCE);
-                    } else if (which == 6) {
+                    } else {
                         confirmRemoveDelivery(position);
                     }
                 })
@@ -493,28 +577,10 @@ public class MainActivity extends Activity {
                 .show();
     }
 
-    private void startProfileForDelivery(int position, String kind) {
-        store.setCurrentIndex(position);
-        selectedIndex = position;
-        AutomationProfile profile = profileManager.findByKind(kind);
-        if (profile == null) {
-            Toast.makeText(this, "Crie este perfil primeiro", Toast.LENGTH_LONG).show();
-            startActivity(new Intent(this, AutomationSettingsActivity.class));
-            return;
-        }
-        if (!Settings.canDrawOverlays(this)) {
-            Toast.makeText(this, "Autorize o painel e toque novamente", Toast.LENGTH_LONG).show();
-            startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:" + getPackageName())));
-            return;
-        }
-        startFloatingPanel(profile);
-        refresh();
-    }
-
-    private void startFloatingPanel(AutomationProfile profile) {
+    private void startFloatingPanel(AutomationProfile profile, boolean resetPosition) {
         Intent service = new Intent(this, FloatingAssistantService.class);
         if (profile != null) service.putExtra(FloatingAssistantService.EXTRA_PROFILE_ID, profile.id);
+        service.putExtra(FloatingAssistantService.EXTRA_RESET_POSITION, resetPosition);
         startForegroundService(service);
     }
 
@@ -938,10 +1004,12 @@ public class MainActivity extends Activity {
         List<Delivery> deliveries = store.getDeliveries();
         int index = store.getCurrentIndex();
         if (!deliveries.isEmpty()) selectedIndex = Math.max(0, Math.min(selectedIndex, deliveries.size() - 1));
-        adapter.submit(deliveries, deliveries.isEmpty() ? -1 : selectedIndex);
+        updatePermissionStatus();
+        renderDeliveryList(deliveries);
 
         if (deliveries.isEmpty()) {
             summaryText.setText("Nenhuma rota carregada • " + houseStore.getHouses().size() + " casas salvas");
+            deliverySectionTitle.setText("Entregas da rota");
             currentDeliveryText.setText("Importe uma lista para começar.");
             setDeliveryActionsEnabled(false);
             showPreview(packagePreview, "");
@@ -951,9 +1019,11 @@ public class MainActivity extends Activity {
 
         String keyboardPosition = index >= deliveries.size() ? "concluída" : (index + 1) + " de " + deliveries.size();
         summaryText.setText("Teclado: " + keyboardPosition + " • Rota: " + (selectedIndex + 1) + " de " + deliveries.size());
+        deliverySectionTitle.setText("Entregas da rota • " + deliveries.size());
         Delivery current = deliveries.get(selectedIndex);
         House house = houseStore.findById(current.houseId);
         String name = house != null && !house.residents.isEmpty() ? house.residents : current.customerName;
+        if ("-".equals(name.trim())) name = "";
         String address = house != null && !house.address.isEmpty() ? house.address : current.address;
         StringBuilder text = new StringBuilder();
         text.append(current.trackingCode).append("\nSomente números: ").append(current.numericCode());
@@ -981,6 +1051,62 @@ public class MainActivity extends Activity {
         generatePdfButton.setText(current.reportUri.isEmpty() ? "Gerar PDF desta entrega" : "✓ Abrir ou atualizar PDF");
         showPreview(packagePreview, current.packagePhotoUri);
         showPreview(facadePreview, facade);
+    }
+
+    private void renderDeliveryList(List<Delivery> deliveries) {
+        if (deliveryContainer == null) return;
+        deliveryContainer.removeAllViews();
+        if (deliveries.isEmpty()) {
+            TextView empty = new TextView(this);
+            empty.setText("Sua rota aparecerá aqui depois da importação.");
+            empty.setTextColor(getColor(R.color.muted));
+            empty.setTextSize(14);
+            empty.setGravity(Gravity.CENTER);
+            empty.setPadding(dp(12), dp(28), dp(12), dp(28));
+            deliveryContainer.addView(empty);
+            return;
+        }
+        LayoutInflater inflater = LayoutInflater.from(this);
+        for (int position = 0; position < deliveries.size(); position++) {
+            Delivery item = deliveries.get(position);
+            View card = inflater.inflate(R.layout.item_delivery, deliveryContainer, false);
+            TextView itemPosition = card.findViewById(R.id.itemPosition);
+            TextView itemCode = card.findViewById(R.id.itemCode);
+            TextView itemName = card.findViewById(R.id.itemName);
+            TextView itemAddress = card.findViewById(R.id.itemAddress);
+            TextView itemPhotoStatus = card.findViewById(R.id.itemPhotoStatus);
+            TextView itemMenu = card.findViewById(R.id.itemMenu);
+            itemPosition.setText(String.valueOf(position + 1));
+            itemCode.setText(item.trackingCode);
+            House house = houseStore.findById(item.houseId);
+            String name = house != null && !house.residents.isEmpty()
+                    ? house.residents : item.customerName;
+            if ("-".equals(name.trim())) name = "";
+            String address = house != null && !house.address.isEmpty()
+                    ? house.address : item.address;
+            String facade = house == null ? item.facadePhotoUri : house.facadePhotoUri;
+            itemName.setText(name);
+            itemName.setVisibility(name.isEmpty() ? View.GONE : View.VISIBLE);
+            itemAddress.setText(address);
+            itemAddress.setVisibility(address.isEmpty() ? View.GONE : View.VISIBLE);
+            itemPhotoStatus.setText(
+                    (item.hasOccurrence() ? "⚠ " : "")
+                            + (item.packagePhotoUri.isEmpty() ? "📦○" : "📦✓") + " "
+                            + (facade.isEmpty() ? "🏠○" : "🏠✓"));
+            final int selected = position;
+            card.setOnClickListener(v -> {
+                selectedIndex = selected;
+                refresh();
+            });
+            itemMenu.setOnClickListener(v -> showDeliveryMenu(selected));
+            card.setBackgroundResource(position == selectedIndex
+                    ? R.drawable.delivery_card_selected : R.drawable.delivery_card);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            params.bottomMargin = dp(9);
+            card.setLayoutParams(params);
+            deliveryContainer.addView(card);
+        }
     }
 
     private void setDeliveryActionsEnabled(boolean enabled) {
@@ -1018,6 +1144,10 @@ public class MainActivity extends Activity {
                 .setMessage(message == null || message.trim().isEmpty() ? "Ocorreu um erro inesperado." : message)
                 .setPositiveButton("OK", null)
                 .show();
+    }
+
+    private int dp(int value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
     @Override

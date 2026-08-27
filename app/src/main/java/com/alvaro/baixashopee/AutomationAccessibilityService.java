@@ -53,11 +53,6 @@ public final class AutomationAccessibilityService extends AccessibilityService {
             callback.onResult(false, "Ative a acessibilidade do Baixa da Shopee");
             return;
         }
-        String allowed = profile == null ? "" : profile.allowedPackage.trim();
-        if (!allowed.isEmpty() && !allowed.equals(getCurrentPackage())) {
-            callback.onResult(false, "Abra o aplicativo autorizado para este perfil: " + allowed);
-            return;
-        }
         service.dispatch(profile, step, callback);
     }
 

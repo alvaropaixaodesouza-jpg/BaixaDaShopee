@@ -39,6 +39,7 @@ import java.util.List;
  */
 public class FloatingAssistantService extends Service {
     public static final String EXTRA_PROFILE_ID = "profileId";
+    public static final String EXTRA_RESET_POSITION = "resetPosition";
     private static final String CHANNEL_ID = "floating_delivery_assistant";
     private static final int NOTIFICATION_ID = 42;
     private static volatile FloatingAssistantService instance;
@@ -63,7 +64,12 @@ public class FloatingAssistantService extends Service {
     private Button addTapButton;
     private Button addSwipeButton;
     private Button removeButton;
+    private View settingsButton;
+    private View toggleDataButton;
+    private Button moveButton;
+    private View closeButton;
     private boolean dataVisible = true;
+    private boolean compactMode;
     private boolean automationRunning;
     private boolean gestureRunning;
     private int stepIndex;
@@ -116,6 +122,9 @@ public class FloatingAssistantService extends Service {
             }
         }
         if (panel == null) showPanel();
+        if (intent != null && intent.getBooleanExtra(EXTRA_RESET_POSITION, false)) {
+            resetPanelPosition();
+        }
         reloadProfile();
         applyPanelSize();
         renderDelivery();
@@ -131,8 +140,7 @@ public class FloatingAssistantService extends Service {
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT);
         panelParams.gravity = Gravity.START | Gravity.TOP;
         panelParams.x = dp(8);
@@ -149,6 +157,10 @@ public class FloatingAssistantService extends Service {
         addTapButton = panel.findViewById(R.id.overlayAddTap);
         addSwipeButton = panel.findViewById(R.id.overlayAddSwipe);
         removeButton = panel.findViewById(R.id.overlayRemoveTarget);
+        settingsButton = panel.findViewById(R.id.overlaySettings);
+        toggleDataButton = panel.findViewById(R.id.overlayToggleData);
+        moveButton = panel.findViewById(R.id.overlayMove);
+        closeButton = panel.findViewById(R.id.overlayClose);
 
         tracking.setOnClickListener(v -> copyCurrent(0));
         numeric.setOnClickListener(v -> copyCurrent(1));
@@ -162,19 +174,20 @@ public class FloatingAssistantService extends Service {
             renderDelivery();
         });
         panel.findViewById(R.id.overlayOpenApp).setOnClickListener(v -> openMainApp());
-        panel.findViewById(R.id.overlayClose).setOnClickListener(v -> stopSelf());
+        closeButton.setOnClickListener(v -> stopSelf());
         play.setOnClickListener(v -> toggleAutomation());
         addTapButton.setOnClickListener(v -> addTap());
         addSwipeButton.setOnClickListener(v -> addSwipe());
         removeButton.setOnClickListener(v -> removeLastStep());
-        panel.findViewById(R.id.overlaySettings).setOnClickListener(v -> openSettings(-1));
-        panel.findViewById(R.id.overlayToggleData).setOnClickListener(v -> {
+        settingsButton.setOnClickListener(v -> openSettings(-1));
+        toggleDataButton.setOnClickListener(v -> {
             dataVisible = !dataVisible;
             dataPanel.setVisibility(dataVisible ? View.VISIBLE : View.GONE);
-            try { windowManager.updateViewLayout(panel, panelParams); } catch (Exception ignored) { }
+            panel.post(this::clampPanelPosition);
         });
-        panel.findViewById(R.id.overlayMove).setOnTouchListener(new PanelDragListener());
+        moveButton.setOnTouchListener(new PanelDragListener());
         windowManager.addView(panel, panelParams);
+        panel.post(this::clampPanelPosition);
     }
 
     private void addTap() {
@@ -241,20 +254,6 @@ public class FloatingAssistantService extends Service {
                     Toast.LENGTH_LONG).show();
             return;
         }
-        String detected = AutomationAccessibilityService.getCurrentPackage();
-        if (activeProfile.allowedPackage.isEmpty() && !detected.isEmpty()
-                && !getPackageName().equals(detected)) {
-            activeProfile.allowedPackage = detected;
-            profileManager.save(activeProfile);
-        }
-        if (!activeProfile.allowedPackage.isEmpty()
-                && !activeProfile.allowedPackage.equals(detected)) {
-            Toast.makeText(this,
-                    "Abra o aplicativo autorizado: " + activeProfile.allowedPackage,
-                    Toast.LENGTH_LONG).show();
-            return;
-        }
-
         automationRunning = true;
         gestureRunning = false;
         stepIndex = 0;
@@ -324,14 +323,39 @@ public class FloatingAssistantService extends Service {
         addTapButton.setEnabled(enabled);
         addSwipeButton.setEnabled(enabled);
         removeButton.setEnabled(enabled);
+        settingsButton.setEnabled(enabled);
+        toggleDataButton.setEnabled(enabled);
+        moveButton.setEnabled(enabled);
+        closeButton.setEnabled(enabled);
+        addTapButton.setAlpha(enabled ? 1f : 0.35f);
+        addSwipeButton.setAlpha(enabled ? 1f : 0.35f);
+        removeButton.setAlpha(enabled ? 1f : 0.35f);
+        settingsButton.setAlpha(enabled ? 1f : 0.35f);
+        toggleDataButton.setAlpha(enabled ? 1f : 0.35f);
+        moveButton.setAlpha(enabled ? 1f : 0.35f);
+        closeButton.setAlpha(enabled ? 1f : 0.35f);
+        setChildrenEnabled(dataPanel, enabled);
+        dataPanel.setAlpha(enabled ? 1f : 0.72f);
         play.setText(enabled ? "▶" : "■");
         play.setTextColor(getColor(enabled
                 ? R.color.secondary_accent_color : R.color.primary_accent_color));
     }
 
+    private void setChildrenEnabled(View view, boolean enabled) {
+        if (view == null) return;
+        view.setEnabled(enabled);
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                setChildrenEnabled(group.getChildAt(i), enabled);
+            }
+        }
+    }
+
     private void renderTargets() {
         removeTargetViews();
         if (windowManager == null || activeProfile == null) return;
+        keepProfileTargetsOnScreen();
         if (hasSwipe()) addSwipeLines();
         for (int i = 0; i < activeProfile.steps.size(); i++) {
             AutomationStep step = activeProfile.steps.get(i);
@@ -342,6 +366,29 @@ public class FloatingAssistantService extends Service {
                 addTargetView(i, true, step.endX, step.endY, (i + 1) + "B");
             }
         }
+    }
+
+    private void keepProfileTargetsOnScreen() {
+        android.graphics.Point screen = screenSize();
+        int radius = dp(activeProfile.targetSizeDp) / 2;
+        int minX = Math.min(radius, Math.max(0, screen.x - 1));
+        int minY = Math.min(radius, Math.max(0, screen.y - 1));
+        int maxX = Math.max(minX, screen.x - radius);
+        int maxY = Math.max(minY, screen.y - radius);
+        boolean changed = false;
+        for (AutomationStep step : activeProfile.steps) {
+            int startX = clamp(step.startX, minX, maxX);
+            int startY = clamp(step.startY, minY, maxY);
+            int endX = clamp(step.endX, minX, maxX);
+            int endY = clamp(step.endY, minY, maxY);
+            changed |= startX != step.startX || startY != step.startY
+                    || endX != step.endX || endY != step.endY;
+            step.startX = startX;
+            step.startY = startY;
+            step.endX = endX;
+            step.endY = endY;
+        }
+        if (changed) profileManager.save(activeProfile);
     }
 
     private boolean hasSwipe() {
@@ -389,8 +436,11 @@ public class FloatingAssistantService extends Service {
                 diameter, diameter, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 flags, PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.START | Gravity.TOP;
-        params.x = Math.max(0, centerX - diameter / 2);
-        params.y = Math.max(0, centerY - diameter / 2);
+        android.graphics.Point screen = screenSize();
+        params.x = Math.max(0, Math.min(centerX - diameter / 2,
+                Math.max(0, screen.x - diameter)));
+        params.y = Math.max(0, Math.min(centerY - diameter / 2,
+                Math.max(0, screen.y - diameter)));
         if (!automationRunning) {
             target.setOnTouchListener(new TargetDragListener(index, endpoint, params, diameter));
         }
@@ -431,8 +481,11 @@ public class FloatingAssistantService extends Service {
                 int dx = (int) (event.getRawX() - downX);
                 int dy = (int) (event.getRawY() - downY);
                 moved |= Math.abs(dx) > dp(3) || Math.abs(dy) > dp(3);
-                params.x = Math.max(0, initialX + dx);
-                params.y = Math.max(0, initialY + dy);
+                android.graphics.Point screen = screenSize();
+                params.x = Math.max(0, Math.min(initialX + dx,
+                        Math.max(0, screen.x - diameter)));
+                params.y = Math.max(0, Math.min(initialY + dy,
+                        Math.max(0, screen.y - diameter)));
                 windowManager.updateViewLayout(view, params);
                 return true;
             }
@@ -470,6 +523,7 @@ public class FloatingAssistantService extends Service {
         private int initialY;
         private float downX;
         private float downY;
+        private boolean moved;
 
         @Override
         public boolean onTouch(View view, MotionEvent event) {
@@ -478,16 +532,79 @@ public class FloatingAssistantService extends Service {
                 initialY = panelParams.y;
                 downX = event.getRawX();
                 downY = event.getRawY();
+                moved = false;
                 return true;
             }
             if (event.getAction() == MotionEvent.ACTION_MOVE) {
-                panelParams.x = Math.max(0, initialX + (int) (event.getRawX() - downX));
-                panelParams.y = Math.max(0, initialY + (int) (event.getRawY() - downY));
+                int dx = (int) (event.getRawX() - downX);
+                int dy = (int) (event.getRawY() - downY);
+                moved |= Math.abs(dx) > dp(4) || Math.abs(dy) > dp(4);
+                panelParams.x = initialX + dx;
+                panelParams.y = initialY + dy;
+                clampPanelCoordinates();
                 windowManager.updateViewLayout(panel, panelParams);
                 return true;
             }
-            return event.getAction() == MotionEvent.ACTION_UP;
+            if (event.getAction() == MotionEvent.ACTION_UP) {
+                if (!moved) toggleCompactMode();
+                else clampPanelPosition();
+                return true;
+            }
+            return false;
         }
+    }
+
+    private void toggleCompactMode() {
+        if (automationRunning) return;
+        compactMode = !compactMode;
+        addTapButton.setVisibility(compactMode ? View.GONE : View.VISIBLE);
+        addSwipeButton.setVisibility(compactMode ? View.GONE : View.VISIBLE);
+        removeButton.setVisibility(compactMode ? View.GONE : View.VISIBLE);
+        settingsButton.setVisibility(compactMode ? View.GONE : View.VISIBLE);
+        toggleDataButton.setVisibility(compactMode ? View.GONE : View.VISIBLE);
+        dataPanel.setVisibility(!compactMode && dataVisible ? View.VISIBLE : View.GONE);
+        moveButton.setText(compactMode ? "▣" : "✥");
+        moveButton.setContentDescription(compactMode
+                ? "Expandir painel" : "Arrastar ou recolher painel");
+        panel.post(this::clampPanelPosition);
+    }
+
+    private void resetPanelPosition() {
+        if (panelParams == null || panel == null) return;
+        panelParams.x = dp(8);
+        panelParams.y = dp(110);
+        compactMode = false;
+        if (addTapButton != null) {
+            addTapButton.setVisibility(View.VISIBLE);
+            addSwipeButton.setVisibility(View.VISIBLE);
+            removeButton.setVisibility(View.VISIBLE);
+            settingsButton.setVisibility(View.VISIBLE);
+            toggleDataButton.setVisibility(View.VISIBLE);
+            dataPanel.setVisibility(dataVisible ? View.VISIBLE : View.GONE);
+            moveButton.setText("✥");
+        }
+        try { windowManager.updateViewLayout(panel, panelParams); }
+        catch (Exception ignored) { }
+        panel.post(this::clampPanelPosition);
+    }
+
+    private void clampPanelPosition() {
+        if (panel == null || panelParams == null || windowManager == null) return;
+        clampPanelCoordinates();
+        try { windowManager.updateViewLayout(panel, panelParams); }
+        catch (Exception ignored) { }
+    }
+
+    private void clampPanelCoordinates() {
+        android.graphics.Point screen = screenSize();
+        int width = panel == null || panel.getWidth() <= 0
+                ? dp(compactMode ? 58 : 278) : panel.getWidth();
+        int height = panel == null || panel.getHeight() <= 0
+                ? dp(compactMode ? 140 : 370) : panel.getHeight();
+        panelParams.x = Math.max(0, Math.min(panelParams.x,
+                Math.max(0, screen.x - Math.min(width, screen.x))));
+        panelParams.y = Math.max(0, Math.min(panelParams.y,
+                Math.max(0, screen.y - Math.min(height, screen.y))));
     }
 
     private final class SwipeLinesView extends View {
@@ -553,6 +670,7 @@ public class FloatingAssistantService extends Service {
         House house = houseStore.findById(current.houseId);
         String name = house != null && !house.residents.isEmpty()
                 ? house.residents : current.customerName;
+        if ("-".equals(name.trim())) name = "";
         String address = house != null && !house.address.isEmpty()
                 ? house.address : current.address;
         String detail = name + (name.isEmpty() || address.isEmpty() ? "" : " • ") + address;
@@ -590,8 +708,10 @@ public class FloatingAssistantService extends Service {
     private void applyPanelSize() {
         if (dataPanel == null || activeProfile == null) return;
         ViewGroup.LayoutParams params = dataPanel.getLayoutParams();
-        params.width = dp(activeProfile.panelWidthDp);
+        int available = Math.max(dp(150), screenSize().x - dp(72));
+        params.width = Math.min(dp(activeProfile.panelWidthDp), available);
         dataPanel.setLayoutParams(params);
+        dataPanel.post(this::clampPanelPosition);
     }
 
     private android.graphics.Point screenSize() {
@@ -630,6 +750,10 @@ public class FloatingAssistantService extends Service {
         return (color & 0x00FFFFFF) | ((alpha & 0xFF) << 24);
     }
 
+    private int clamp(int value, int minimum, int maximum) {
+        return Math.max(minimum, Math.min(maximum, value));
+    }
+
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
@@ -637,7 +761,7 @@ public class FloatingAssistantService extends Service {
     private void createNotificationChannel() {
         NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         NotificationChannel channel = new NotificationChannel(CHANNEL_ID,
-                "Clique automático e entregas", NotificationManager.IMPORTANCE_LOW);
+                "Painel flutuante", NotificationManager.IMPORTANCE_LOW);
         channel.setDescription("Mantém o painel flutuante disponível durante a rota.");
         manager.createNotificationChannel(channel);
     }
@@ -649,7 +773,7 @@ public class FloatingAssistantService extends Service {
         return new Notification.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_delivery)
                 .setContentTitle("Baixa da Shopee")
-                .setContentText("Clique automático disponível • toque para abrir")
+                .setContentText("Painel flutuante ativo • toque para abrir")
                 .setContentIntent(pending)
                 .setOngoing(true)
                 .build();

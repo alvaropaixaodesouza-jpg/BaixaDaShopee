@@ -362,11 +362,12 @@ public final class SpreadsheetImporter {
         XmlPullParser parser = newParser(xmlBytes);
         StringBuilder current = null;
         while (parser.getEventType() != XmlPullParser.END_DOCUMENT) {
-            if (parser.getEventType() == XmlPullParser.START_TAG && parser.getName().equals("si")) {
+            String tag = localTag(parser.getName());
+            if (parser.getEventType() == XmlPullParser.START_TAG && tag.equals("si")) {
                 current = new StringBuilder();
-            } else if (parser.getEventType() == XmlPullParser.START_TAG && parser.getName().equals("t") && current != null) {
+            } else if (parser.getEventType() == XmlPullParser.START_TAG && tag.equals("t") && current != null) {
                 current.append(parser.nextText());
-            } else if (parser.getEventType() == XmlPullParser.END_TAG && parser.getName().equals("si") && current != null) {
+            } else if (parser.getEventType() == XmlPullParser.END_TAG && tag.equals("si") && current != null) {
                 strings.add(current.toString());
                 current = null;
             }
@@ -385,7 +386,10 @@ public final class SpreadsheetImporter {
 
         while (parser.getEventType() != XmlPullParser.END_DOCUMENT) {
             int event = parser.getEventType();
-            String name = parser.getName();
+            // Excel, LibreOffice e geradores de IA podem escrever exatamente o
+            // mesmo XLSX usando <c>/<v> ou <x:c>/<x:v>. O prefixo não muda o
+            // significado da célula e não pode fazer a rota parecer vazia.
+            String name = localTag(parser.getName());
             if (event == XmlPullParser.START_TAG && "row".equals(name)) {
                 currentRow = new ArrayList<>();
             } else if (event == XmlPullParser.START_TAG && "c".equals(name)) {
@@ -425,6 +429,12 @@ public final class SpreadsheetImporter {
         XmlPullParser parser = factory.newPullParser();
         parser.setInput(new ByteArrayInputStream(xmlBytes), "UTF-8");
         return parser;
+    }
+
+    private static String localTag(String name) {
+        if (name == null) return "";
+        int separator = name.indexOf(':');
+        return separator >= 0 ? name.substring(separator + 1) : name;
     }
 
     private static int columnFromReference(String reference) {

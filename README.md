@@ -1,4 +1,4 @@
-# Baixa da Shopee — Android 0.6.0
+# Baixa da Shopee — Android 0.7.0
 
 Aplicativo Android local com um teclado personalizado para organizar uma fila de entregas e inserir, no campo atualmente selecionado:
 
@@ -20,7 +20,7 @@ Esse controle evita o erro mais perigoso do fluxo: o código completo de uma ent
 
 O aplicativo aceita:
 
-- `.xlsx` moderno, lendo a primeira aba;
+- `.xlsx` moderno, procurando automaticamente a aba que contém os rastreios;
 - `.csv` separado por ponto e vírgula, vírgula ou tabulação;
 - códigos colados, um por linha;
 - linhas coladas no formato `código; nome; endereço`.
@@ -69,9 +69,11 @@ O botão **Gerar PDF desta entrega** cria um relatório em `Documentos/BaixaDaSh
 
 ## Painel flutuante assistido
 
-O botão **Painel flutuante assistido** abre as autorizações de sobreposição e acessibilidade. Existem perfis editáveis de **Baixa assistida** e **Ocorrência assistida**. A barra permite adicionar alvo de toque, adicionar deslize A→B, remover o último alvo, arrastar pontos, editar atraso/duração e carregar outra configuração. Cada pressão em **▶** executa somente o próximo passo; no fim do ciclo, o painel para para conferência manual. O perfil fica preso ao pacote Android detectado durante o mapeamento.
+O botão **▶ Painel** mostra o estado das duas autorizações e guia o usuário primeiro à sobreposição e depois diretamente ao serviço de acessibilidade. Existem três perfis editáveis e inicialmente vazios: **Baixar**, **Ocorrência** e **Tirar de ocorrência**. A barra permite adicionar alvo de toque, adicionar deslize A→B, remover o último alvo, arrastar pontos, editar atraso/duração e carregar outra configuração.
 
-Cada entrega possui o menu `⋮` para editar nome/endereço, colocar ou remover ocorrência, abrir o perfil de Baixa/Ocorrência e excluir somente aquele item da rota. As definições de ocorrência são editáveis e ficam salvas para as próximas rotas.
+Nenhum gesto começa durante o mapeamento. Somente **▶ Play** inicia a sequência salva. Durante a execução, os controles de edição ficam bloqueados, o botão se torna **■ Stop**, os marcadores deixam os toques manuais atravessarem para a tela abaixo e o perfil para por ciclos, tempo ou comando do usuário. Tocar no controle de mover recolhe ou expande a barra; arrastá-lo move o painel. Ao abrir o painel pela tela principal, sua posição é recuperada para dentro da área visível.
+
+Cada entrega possui o menu `⋮` somente para editar nome/endereço, colocar/alterar/remover ocorrência e excluir aquele item da rota. Perfis e definições de ocorrência ficam concentrados nas configurações do autoclique.
 
 As cores do painel estão centralizadas em `colors.xml`: `overlay_bg_color`, `primary_accent_color`, `secondary_accent_color`, `target_circle_color` e `text_primary_color`.
 
@@ -91,7 +93,7 @@ Para gerar um APK, use **Build > Build Bundle(s) / APK(s) > Build APK(s)**.
 
 ### Pelo GitHub Actions
 
-O arquivo `.github/workflows/build-apk.yml` compila o APK ao enviar o projeto para um repositório GitHub. Na aba **Actions**, execute **Gerar APK** e baixe o artefato `BaixaDaShopee-debug`.
+O arquivo `.github/workflows/build-apk.yml` compila e assina o APK ao enviar o projeto para o GitHub. Na aba **Actions**, execute **Gerar APK** e baixe o artefato `BaixaDaShopee-v0.7`.
 
 ## Como ativar no celular
 

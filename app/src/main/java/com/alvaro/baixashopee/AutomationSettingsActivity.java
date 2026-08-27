@@ -51,7 +51,6 @@ public final class AutomationSettingsActivity extends Activity {
     private ProfileManager profileManager;
     private AutomationProfile profile;
     private EditText nameInput;
-    private EditText packageInput;
     private EditText cycleInput;
     private EditText durationInput;
     private Spinner kindSpinner;
@@ -66,6 +65,7 @@ public final class AutomationSettingsActivity extends Activity {
         profileManager = new ProfileManager(this);
         profile = profileManager.getActive();
         if (profile == null) profile = profileManager.create("Nova configuração");
+        getWindow().setStatusBarColor(getColor(R.color.cream));
         setContentView(buildContent());
         render();
 
@@ -82,30 +82,16 @@ public final class AutomationSettingsActivity extends Activity {
         content.setPadding(pad, pad, pad, pad);
         content.setBackgroundColor(getColor(R.color.cream));
 
-        content.addView(text("Clique automático", 25, true));
+        content.addView(text("Predefinições do autoclique", 25, true));
         TextView explanation = text(
-                "Nada toca sozinho enquanto você edita. Posicione os alvos no painel flutuante e somente Play inicia a sequência salva.",
+                "Escolha Baixar, Ocorrência ou Tirar de ocorrência. Todas começam vazias: adicione e mova os alvos no painel. Somente Play inicia a sequência.",
                 14, false);
         explanation.setTextColor(getColor(R.color.muted));
         explanation.setPadding(0, dp(6), 0, dp(12));
         content.addView(explanation);
 
         nameInput = field("Nome da configuração");
-        packageInput = field("Aplicativo autorizado (opcional)");
         content.addView(nameInput);
-        content.addView(packageInput);
-
-        Button useCurrent = button("Usar o aplicativo aberto por último");
-        useCurrent.setOnClickListener(v -> {
-            String detected = AutomationAccessibilityService.getCurrentPackage();
-            if (detected.isEmpty() || getPackageName().equals(detected)) {
-                Toast.makeText(this, "Abra primeiro o aplicativo que será mapeado",
-                        Toast.LENGTH_LONG).show();
-            } else {
-                packageInput.setText(detected);
-            }
-        });
-        content.addView(useCurrent);
 
         content.addView(label("Usar esta configuração em"));
         kindSpinner = spinner(KIND_LABELS);
@@ -185,6 +171,8 @@ public final class AutomationSettingsActivity extends Activity {
         LinearLayout footer = horizontal();
         Button close = button("Fechar");
         Button save = button("Salvar");
+        save.setBackgroundResource(R.drawable.button_primary);
+        save.setTextColor(getColor(R.color.white));
         footer.addView(close, weighted());
         footer.addView(space());
         footer.addView(save, weighted());
@@ -203,7 +191,6 @@ public final class AutomationSettingsActivity extends Activity {
 
     private void render() {
         nameInput.setText(profile.name);
-        packageInput.setText(profile.allowedPackage);
         kindSpinner.setSelection(indexOf(KIND_VALUES, profile.kind));
         stopSpinner.setSelection(indexOf(STOP_VALUES, profile.stopMode));
         cycleInput.setText(String.valueOf(profile.cycleLimit));
@@ -419,7 +406,7 @@ public final class AutomationSettingsActivity extends Activity {
         if (profile == null) return;
         profile.name = nameInput.getText().toString().trim();
         if (profile.name.isEmpty()) profile.name = "Nova configuração";
-        profile.allowedPackage = packageInput.getText().toString().trim();
+        profile.allowedPackage = "";
         profile.kind = KIND_VALUES[Math.max(0, kindSpinner.getSelectedItemPosition())];
         profile.stopMode = STOP_VALUES[Math.max(0, stopSpinner.getSelectedItemPosition())];
         profile.cycleLimit = (int) Math.max(1, number(cycleInput, 1));
@@ -454,6 +441,14 @@ public final class AutomationSettingsActivity extends Activity {
         EditText input = new EditText(this);
         input.setHint(hint);
         input.setSingleLine(true);
+        input.setTextColor(getColor(R.color.ink));
+        input.setHintTextColor(getColor(R.color.muted));
+        input.setBackgroundResource(R.drawable.field_soft);
+        input.setPadding(dp(13), dp(8), dp(13), dp(8));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52));
+        params.topMargin = dp(6);
+        input.setLayoutParams(params);
         return input;
     }
 
@@ -473,6 +468,8 @@ public final class AutomationSettingsActivity extends Activity {
         Spinner spinner = new Spinner(this);
         spinner.setAdapter(new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_dropdown_item, values));
+        spinner.setPadding(dp(10), 0, dp(10), 0);
+        spinner.setMinimumHeight(dp(52));
         return spinner;
     }
 
@@ -495,6 +492,9 @@ public final class AutomationSettingsActivity extends Activity {
         Button button = new Button(this);
         button.setText(value);
         button.setAllCaps(false);
+        button.setBackgroundResource(R.drawable.button_secondary);
+        button.setTextColor(getColor(R.color.orange_dark));
+        button.setMinHeight(dp(50));
         return button;
     }
 

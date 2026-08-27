@@ -10,8 +10,8 @@
 6. `SpreadsheetImporter`: leitor local de CSV e XLSX, sem biblioteca externa e sem enviar a planilha para a internet.
 7. `MediaStore`: grava fotos na coleção de imagens do Android com nomes associados ao rastreio.
 8. `ProfileManager`: salva perfis Baixa/Ocorrência e alvos em JSON local.
-9. `FloatingAssistantService`: mostra a fila, os controles de mapeamento e os alvos sobre o app autorizado.
-10. `AutomationAccessibilityService`: executa somente um gesto por comando explícito e valida o pacote Android ativo.
+9. `FloatingAssistantService`: mostra a fila, os controles de mapeamento e os alvos sobre a tela escolhida pelo usuário.
+10. `AutomationAccessibilityService`: executa a sequência somente depois do comando Play e mantém Stop disponível.
 11. `OccurrenceManager`: mantém definições editáveis separadas da rota do dia.
 12. `BarcodeReader`: usa o modelo de QR Code incorporado ao APK.
 
@@ -32,7 +32,7 @@ O índice representa somente a posição de trabalho na fila. Ele não significa
 ## O que foi deliberadamente excluído
 
 - confirmação automática de entrega;
-- repetição indefinida e mecanismos de anti-detecção;
+- mecanismos de anti-detecção ou ocultação da automação;
 - GPS falso ou substituição da posição real da fotografia;
 - leitura ou alteração do banco de dados da Shopee;
 - captura silenciosa de tela ou de teclado;

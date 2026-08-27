@@ -8,80 +8,229 @@
 
     <LinearLayout
         android:id="@+id/overlayToolbar"
-        android:layout_width="54dp"
+        android:layout_width="58dp"
         android:layout_height="wrap_content"
         android:background="@drawable/overlay_panel"
         android:orientation="vertical"
-        android:padding="3dp">
+        android:padding="5dp">
 
-        <Button android:id="@+id/overlayPlay" android:layout_width="48dp" android:layout_height="48dp"
-            android:minHeight="0dp" android:minWidth="0dp" android:padding="0dp" android:text="▶"
-            android:textColor="@color/secondary_accent_color" android:textSize="25sp" android:textStyle="bold" />
-        <Button android:id="@+id/overlayAddTap" android:layout_width="48dp" android:layout_height="48dp"
-            android:minHeight="0dp" android:minWidth="0dp" android:padding="0dp" android:text="＋"
-            android:textColor="@color/green" android:textSize="25sp" android:textStyle="bold" />
-        <Button android:id="@+id/overlayAddSwipe" android:layout_width="48dp" android:layout_height="48dp"
-            android:minHeight="0dp" android:minWidth="0dp" android:padding="0dp" android:text="↝"
-            android:textColor="#FFB020" android:textSize="25sp" android:textStyle="bold" />
-        <Button android:id="@+id/overlayRemoveTarget" android:layout_width="48dp" android:layout_height="48dp"
-            android:minHeight="0dp" android:minWidth="0dp" android:padding="0dp" android:text="−"
-            android:textColor="#FF4D2D" android:textSize="26sp" android:textStyle="bold" />
-        <Button android:id="@+id/overlaySettings" android:layout_width="48dp" android:layout_height="48dp"
-            android:minHeight="0dp" android:minWidth="0dp" android:padding="0dp" android:text="⚙"
-            android:textColor="@color/text_primary_color" android:textSize="22sp" />
-        <Button android:id="@+id/overlayToggleData" android:layout_width="48dp" android:layout_height="43dp"
-            android:minHeight="0dp" android:minWidth="0dp" android:padding="0dp" android:text="▣"
-            android:textColor="@color/primary_accent_color" android:textSize="20sp" />
-        <Button android:id="@+id/overlayMove" android:layout_width="48dp" android:layout_height="43dp"
-            android:minHeight="0dp" android:minWidth="0dp" android:padding="0dp" android:text="✥"
-            android:textColor="@color/text_primary_color" android:textSize="21sp" />
-        <Button android:id="@+id/overlayClose" android:layout_width="48dp" android:layout_height="40dp"
-            android:minHeight="0dp" android:minWidth="0dp" android:padding="0dp" android:text="×"
-            android:textColor="@color/text_primary_color" android:textSize="24sp" />
+        <Button
+            android:id="@+id/overlayPlay"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/overlay_button_play"
+            android:contentDescription="Iniciar ou parar"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
+            android:text="▶"
+            android:textColor="@color/secondary_accent_color"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/overlayAddTap"
+            android:layout_width="48dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/overlay_button"
+            android:contentDescription="Adicionar toque"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
+            android:text="＋"
+            android:textColor="#57C58A"
+            android:textSize="25sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/overlayAddSwipe"
+            android:layout_width="48dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="3dp"
+            android:background="@drawable/overlay_button"
+            android:contentDescription="Adicionar deslize"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
+            android:text="↝"
+            android:textColor="#FFB74F"
+            android:textSize="25sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/overlayRemoveTarget"
+            android:layout_width="48dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="3dp"
+            android:background="@drawable/overlay_button"
+            android:contentDescription="Remover último alvo"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
+            android:text="−"
+            android:textColor="#FF8068"
+            android:textSize="25sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/overlaySettings"
+            android:layout_width="48dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="3dp"
+            android:background="@drawable/overlay_button"
+            android:contentDescription="Configurações"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
+            android:text="⚙"
+            android:textColor="@color/text_primary_color"
+            android:textSize="21sp" />
+
+        <Button
+            android:id="@+id/overlayToggleData"
+            android:layout_width="48dp"
+            android:layout_height="42dp"
+            android:layout_marginTop="3dp"
+            android:background="@drawable/overlay_button"
+            android:contentDescription="Mostrar ou esconder dados"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
+            android:text="▣"
+            android:textColor="@color/primary_accent_color"
+            android:textSize="20sp" />
+
+        <Button
+            android:id="@+id/overlayMove"
+            android:layout_width="48dp"
+            android:layout_height="42dp"
+            android:layout_marginTop="3dp"
+            android:background="@drawable/overlay_button"
+            android:contentDescription="Arrastar ou recolher painel"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
+            android:text="✥"
+            android:textColor="@color/text_primary_color"
+            android:textSize="20sp" />
+
+        <Button
+            android:id="@+id/overlayClose"
+            android:layout_width="48dp"
+            android:layout_height="39dp"
+            android:layout_marginTop="3dp"
+            android:background="@drawable/overlay_button"
+            android:contentDescription="Fechar painel"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
+            android:text="×"
+            android:textColor="#D6CFCC"
+            android:textSize="23sp" />
     </LinearLayout>
 
     <LinearLayout
         android:id="@+id/overlayDataPanel"
-        android:layout_width="220dp"
+        android:layout_width="214dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="5dp"
+        android:layout_marginStart="6dp"
         android:background="@drawable/overlay_panel"
         android:orientation="vertical"
-        android:padding="8dp">
+        android:padding="10dp">
 
-        <TextView android:id="@+id/overlayProgress" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:gravity="center" android:text="Entrega 1 de 1"
-            android:textColor="@color/text_primary_color" android:textSize="12sp" android:textStyle="bold" />
-        <TextView android:id="@+id/overlayPerson" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:layout_marginTop="3dp" android:ellipsize="end"
-            android:maxLines="2" android:textColor="@color/text_primary_color" android:textSize="11sp"
+        <TextView
+            android:id="@+id/overlayProgress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="Entrega 1 de 1"
+            android:textColor="@color/text_primary_color"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/overlayPerson"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textColor="#E7DFDC"
+            android:textSize="11sp"
             android:visibility="gone" />
-        <TextView android:id="@+id/overlayProfileName" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:layout_marginTop="5dp" android:gravity="center"
-            android:text="Configuração" android:textColor="@color/secondary_accent_color"
-            android:textSize="12sp" android:textStyle="bold" />
 
-        <Button android:id="@+id/overlayTracking" android:layout_width="match_parent"
-            android:layout_height="43dp" android:layout_marginTop="6dp" android:background="@drawable/button_primary"
-            android:text="Código completo" android:textAllCaps="false" android:textColor="@color/text_primary_color"
-            android:textSize="11sp" />
-        <Button android:id="@+id/overlayNumeric" android:layout_width="match_parent"
-            android:layout_height="43dp" android:layout_marginTop="5dp" android:background="@drawable/button_secondary"
-            android:text="Somente números" android:textAllCaps="false" android:textColor="@color/orange_dark"
-            android:textSize="11sp" />
-        <Button android:id="@+id/overlayReceiver" android:layout_width="match_parent"
-            android:layout_height="43dp" android:layout_marginTop="5dp" android:background="@drawable/button_secondary"
-            android:text="Nome do recebedor" android:textAllCaps="false" android:textColor="@color/orange_dark"
+        <TextView
+            android:id="@+id/overlayProfileName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:text="Configuração"
+            android:textColor="@color/secondary_accent_color"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/overlayTracking"
+            android:layout_width="match_parent"
+            android:layout_height="43dp"
+            android:layout_marginTop="7dp"
+            android:background="@drawable/button_primary"
+            android:text="Código completo"
+            android:textAllCaps="false"
+            android:textColor="@color/text_primary_color"
             android:textSize="11sp" />
 
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="5dp" android:orientation="horizontal">
-            <Button android:id="@+id/overlayPrevious" android:layout_width="0dp" android:layout_height="42dp"
-                android:layout_weight="1" android:text="←" android:textColor="@color/ink" />
-            <Button android:id="@+id/overlayOpenApp" android:layout_width="0dp" android:layout_height="42dp"
-                android:layout_weight="1" android:text="App" android:textAllCaps="false" android:textColor="@color/ink" />
-            <Button android:id="@+id/overlayNext" android:layout_width="0dp" android:layout_height="42dp"
-                android:layout_weight="1" android:text="→" android:textColor="@color/ink" />
+        <Button
+            android:id="@+id/overlayNumeric"
+            android:layout_width="match_parent"
+            android:layout_height="43dp"
+            android:layout_marginTop="5dp"
+            android:background="@drawable/button_secondary"
+            android:text="Somente números"
+            android:textAllCaps="false"
+            android:textColor="@color/orange_dark"
+            android:textSize="11sp" />
+
+        <Button
+            android:id="@+id/overlayReceiver"
+            android:layout_width="match_parent"
+            android:layout_height="43dp"
+            android:layout_marginTop="5dp"
+            android:background="@drawable/button_secondary"
+            android:text="Nome do recebedor"
+            android:textAllCaps="false"
+            android:textColor="@color/orange_dark"
+            android:textSize="11sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+            <Button
+                android:id="@+id/overlayPrevious"
+                android:layout_width="0dp"
+                android:layout_height="42dp"
+                android:layout_weight="1"
+                android:text="←"
+                android:textColor="@color/ink" />
+            <Button
+                android:id="@+id/overlayOpenApp"
+                android:layout_width="0dp"
+                android:layout_height="42dp"
+                android:layout_weight="1"
+                android:text="App"
+                android:textAllCaps="false"
+                android:textColor="@color/ink" />
+            <Button
+                android:id="@+id/overlayNext"
+                android:layout_width="0dp"
+                android:layout_height="42dp"
+                android:layout_weight="1"
+                android:text="→"
+                android:textColor="@color/ink" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>
