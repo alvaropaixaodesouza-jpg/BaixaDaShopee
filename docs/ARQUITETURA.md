@@ -21,7 +21,7 @@
 
 ## Automação assistida
 
-O serviço de acessibilidade não executa loop oculto. Cada toque em `▶` envia um único `dispatchGesture`, depois aguarda o atraso configurado. Antes do gesto, os marcadores saem temporariamente da tela para o toque alcançar o aplicativo abaixo. O perfil só funciona quando o pacote Android atual é exatamente o pacote salvo durante o mapeamento. Ao terminar a sequência, o índice volta ao primeiro passo e a confirmação final permanece manual.
+O serviço de acessibilidade fica inativo durante a edição. Somente o botão `Play` inicia a sequência de `dispatchGesture`. Os marcadores passam a aceitar o toque através deles, permitindo interação manual com o aplicativo abaixo. O perfil pode parar por ciclos, por tempo ou pelo botão `Parar`; a confirmação final permanece manual.
 
 ## Estado de uma entrega no teclado
 

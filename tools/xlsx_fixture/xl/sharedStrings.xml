@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="9" uniqueCount="9">
+  <si><t>Código de rastreio</t></si>
+  <si><t>Destinatário</t></si>
+  <si><t>Endereço</t></si>
+  <si><t>BR333333333</t></si>
+  <si><t>Carla</t></si>
+  <si><t>Rua C, 30</t></si>
+  <si><t>BR444444444</t></si>
+  <si><t>Davi</t></si>
+  <si><t>Rua D, 40</t></si>
+</sst>

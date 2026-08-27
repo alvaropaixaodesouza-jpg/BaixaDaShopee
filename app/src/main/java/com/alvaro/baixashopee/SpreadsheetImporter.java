@@ -304,11 +304,39 @@ public final class SpreadsheetImporter {
 
         List<String> sheets = new ArrayList<>();
         for (String name : entries.keySet()) {
-            if (name.matches("xl/worksheets/sheet[0-9]+\\.xml")) sheets.add(name);
+            if (name.matches("xl/worksheets/[^/]+\\.xml")) sheets.add(name);
         }
         Collections.sort(sheets, Comparator.naturalOrder());
         if (sheets.isEmpty()) throw new IOException("O arquivo .xlsx não contém uma planilha legível.");
-        return parseSheet(entries.get(sheets.get(0)), sharedStrings);
+
+        // Alguns arquivos da rota possuem uma primeira aba vazia ou somente informativa.
+        // Avaliamos todas as abas e escolhemos a que realmente contém os códigos.
+        List<List<String>> bestRows = new ArrayList<>();
+        int bestScore = -1;
+        for (String sheet : sheets) {
+            List<List<String>> rows = parseSheet(entries.get(sheet), sharedStrings);
+            int score = sheetScore(rows);
+            if (score > bestScore) {
+                bestScore = score;
+                bestRows = rows;
+            }
+        }
+        return bestRows;
+    }
+
+    private static int sheetScore(List<List<String>> rows) {
+        int nonEmptyRows = 0;
+        int trackingCodes = 0;
+        for (List<String> row : rows) {
+            boolean hasValue = false;
+            for (String value : row) {
+                String normalized = normalizeCellCode(value);
+                if (!normalized.isEmpty()) hasValue = true;
+                if (TrackingCode.looksLikeTrackingCode(normalized)) trackingCodes++;
+            }
+            if (hasValue) nonEmptyRows++;
+        }
+        return trackingCodes * 1_000 + nonEmptyRows;
     }
 
     private static Map<String, byte[]> unzipRelevantEntries(byte[] bytes) throws IOException {
@@ -317,7 +345,8 @@ public final class SpreadsheetImporter {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
                 String name = entry.getName();
-                if (name.equals("xl/sharedStrings.xml") || name.matches("xl/worksheets/sheet[0-9]+\\.xml")) {
+                if (name.equals("xl/sharedStrings.xml")
+                        || name.matches("xl/worksheets/[^/]+\\.xml")) {
                     entries.put(name, readLimited(zip, MAX_ZIP_ENTRY_BYTES));
                 }
                 zip.closeEntry();

@@ -87,7 +87,7 @@
                 android:layout_height="50dp"
                 android:layout_marginTop="8dp"
                 android:background="@drawable/button_secondary"
-                android:text="Painel flutuante assistido"
+                android:text="Clique automático + entregas"
                 android:textAllCaps="false"
                 android:textColor="@color/orange_dark"
                 android:textStyle="bold" />

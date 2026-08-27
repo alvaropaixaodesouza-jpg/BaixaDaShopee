@@ -2,5 +2,5 @@
 <resources>
     <string name="app_name">Baixa da Shopee</string>
     <string name="keyboard_name">Baixa da Shopee</string>
-    <string name="accessibility_description">Executa, com comando explícito do usuário, os toques e deslizes mapeados no painel assistido.</string>
+    <string name="accessibility_description">Executa somente após Play os toques e deslizes que o usuário criou e salvou no painel flutuante.</string>
 </resources>

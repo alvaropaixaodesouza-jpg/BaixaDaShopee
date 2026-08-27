@@ -47,13 +47,13 @@ jobs:
             --ks-pass pass:android \
             --key-pass pass:android \
             --ks-key-alias androiddebugkey \
-            --out app/build/outputs/apk/debug/BaixaDaShopee-v0.5.apk \
+            --out app/build/outputs/apk/debug/BaixaDaShopee-v0.6.apk \
             app/build/outputs/apk/debug/app-debug.apk
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs \
-            app/build/outputs/apk/debug/BaixaDaShopee-v0.5.apk
+            app/build/outputs/apk/debug/BaixaDaShopee-v0.6.apk
 
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
         with:
-          name: BaixaDaShopee-debug
-          path: app/build/outputs/apk/debug/BaixaDaShopee-v0.5.apk
+          name: BaixaDaShopee-v0.6
+          path: app/build/outputs/apk/debug/BaixaDaShopee-v0.6.apk

@@ -75,13 +75,13 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Painel flutuante assistido para organização manual de entregas" />
+                android:value="Painel flutuante configurado pelo usuário para organizar dados e executar gestos autorizados" />
         </service>
 
         <service
             android:name=".AutomationAccessibilityService"
             android:exported="true"
-            android:label="Baixa da Shopee — passos assistidos"
+            android:label="Baixa da Shopee — Automação"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />

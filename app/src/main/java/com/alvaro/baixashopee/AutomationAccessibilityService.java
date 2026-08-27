@@ -7,10 +7,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.accessibility.AccessibilityEvent;
 
-/**
- * Executa somente um passo por comando explícito do usuário no painel.
- * A confirmação final da entrega permanece fora do fluxo automático.
- */
+/** Executa os gestos definidos pelo usuário somente depois do comando Play. */
 public final class AutomationAccessibilityService extends AccessibilityService {
     public interface GestureCallback {
         void onResult(boolean success, String message);
@@ -57,11 +54,7 @@ public final class AutomationAccessibilityService extends AccessibilityService {
             return;
         }
         String allowed = profile == null ? "" : profile.allowedPackage.trim();
-        if (allowed.isEmpty()) {
-            callback.onResult(false, "Mapeie este perfil dentro do aplicativo autorizado primeiro");
-            return;
-        }
-        if (!allowed.equals(getCurrentPackage())) {
+        if (!allowed.isEmpty() && !allowed.equals(getCurrentPackage())) {
             callback.onResult(false, "Abra o aplicativo autorizado para este perfil: " + allowed);
             return;
         }

@@ -2,6 +2,7 @@ package com.alvaro.baixashopee;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
@@ -312,15 +313,21 @@ public class MainActivity extends Activity {
     }
 
     private void showFloatingPanelControls() {
+        String overlayStatus = Settings.canDrawOverlays(this) ? "✓ autorizado" : "○ falta autorizar";
+        String accessibilityStatus = isAutomationAccessibilityEnabled()
+                ? "✓ ativada" : "○ desativada ou bloqueada";
         new AlertDialog.Builder(this)
-                .setTitle("Painel flutuante assistido")
-                .setMessage("O painel copia os dados da rota e executa um alvo por vez. A confirmação final continua manual.")
+                .setTitle("Clique automático")
+                .setMessage("Sobre outros apps: " + overlayStatus
+                        + "\nAcessibilidade: " + accessibilityStatus
+                        + "\n\nNada será executado antes de você tocar em Play.")
                 .setItems(new String[]{
                                 "1. Autorizar sobre outros aplicativos",
-                                "2. Ativar acessibilidade",
-                                "Iniciar painel",
-                                "Editar perfis e ocorrências",
-                                "Parar painel"
+                                "2. Liberar configurações restritas no Samsung",
+                                "3. Ativar acessibilidade",
+                                "4. Abrir painel e editor de alvos",
+                                "5. Gerenciar predefinições",
+                                "6. Fechar painel"
                         },
                         (dialog, which) -> {
                             if (which == 0) {
@@ -328,14 +335,16 @@ public class MainActivity extends Activity {
                                         Uri.parse("package:" + getPackageName()));
                                 startActivity(permission);
                             } else if (which == 1) {
-                                startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                                showRestrictedSettingsHelp();
                             } else if (which == 2) {
+                                startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                            } else if (which == 3) {
                                 if (!Settings.canDrawOverlays(this)) {
                                     Toast.makeText(this, "Autorize primeiro o painel flutuante", Toast.LENGTH_LONG).show();
                                     return;
                                 }
                                 startFloatingPanel(profileManager.getActive());
-                            } else if (which == 3) {
+                            } else if (which == 4) {
                                 startActivity(new Intent(this, AutomationSettingsActivity.class));
                             } else {
                                 stopService(new Intent(this, FloatingAssistantService.class));
@@ -343,6 +352,30 @@ public class MainActivity extends Activity {
                         })
                 .setNegativeButton("Fechar", null)
                 .show();
+    }
+
+    private void showRestrictedSettingsHelp() {
+        new AlertDialog.Builder(this)
+                .setTitle("Liberar no Samsung")
+                .setMessage("Na tela de informações do aplicativo, toque nos três pontos no alto e escolha “Permitir configurações restritas”. Depois volte e ative a acessibilidade. Essa autorização só pode ser feita por você.")
+                .setNegativeButton("Cancelar", null)
+                .setPositiveButton("Abrir informações do app", (dialog, which) -> {
+                    Intent details = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:" + getPackageName()));
+                    startActivity(details);
+                }).show();
+    }
+
+    private boolean isAutomationAccessibilityEnabled() {
+        String enabled = Settings.Secure.getString(getContentResolver(),
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        if (enabled == null || enabled.isEmpty()) return false;
+        String component = new ComponentName(this,
+                AutomationAccessibilityService.class).flattenToString();
+        for (String item : enabled.split(":")) {
+            if (component.equalsIgnoreCase(item)) return true;
+        }
+        return false;
     }
 
     private void showDeliveryMenu(int position) {
@@ -356,8 +389,9 @@ public class MainActivity extends Activity {
                 "Editar nome e endereço",
                 occurrenceAction,
                 secondaryAction,
-                "Usar perfil Baixa assistida",
-                "Usar perfil Ocorrência assistida",
+                "Abrir predefinição Baixar",
+                "Abrir predefinição Ocorrência",
+                "Abrir predefinição Tirar de ocorrência",
                 "Excluir desta rota"
         };
         new AlertDialog.Builder(this)
@@ -375,6 +409,8 @@ public class MainActivity extends Activity {
                     } else if (which == 4) {
                         startProfileForDelivery(position, AutomationProfile.KIND_OCCURRENCE);
                     } else if (which == 5) {
+                        startProfileForDelivery(position, AutomationProfile.KIND_REMOVE_OCCURRENCE);
+                    } else if (which == 6) {
                         confirmRemoveDelivery(position);
                     }
                 })

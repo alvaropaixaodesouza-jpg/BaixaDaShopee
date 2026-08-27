@@ -1,4 +1,4 @@
-# Baixa da Shopee — Android 0.5.0
+# Baixa da Shopee — Android 0.6.0
 
 Aplicativo Android local com um teclado personalizado para organizar uma fila de entregas e inserir, no campo atualmente selecionado:
 
@@ -6,7 +6,7 @@ Aplicativo Android local com um teclado personalizado para organizar uma fila de
 - o mesmo código contendo somente os algarismos;
 - um nome fixo configurado pelo entregador.
 
-O projeto não acessa contas nem confirma entregas. O painel assistido pode executar um toque ou deslize mapeado por vez, depois de o usuário ativar a acessibilidade e autorizar o pacote Android correto. A conferência e a confirmação final continuam manuais. Ele não solicita permissão de internet.
+O projeto não acessa contas nem confirma entregas. O clique automático executa, somente depois de Play, a sequência de toques e deslizes criada pelo próprio usuário. É possível parar, editar, limpar, duplicar, importar e exportar perfis; a tela abaixo continua disponível para interação manual. A conferência e a confirmação final continuam manuais. Ele não solicita permissão de internet.
 
 ## Fluxo do teclado
 
