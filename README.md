@@ -1,121 +1,101 @@
-# Baixa da Shopee — Android 0.7.0
+# Baixas de Pacote — Android 0.8.0
 
-Aplicativo Android local com um teclado personalizado para organizar uma fila de entregas e inserir, no campo atualmente selecionado:
+Aplicativo Android local com banco de dados estruturado e teclado personalizado (**Teclado das baixas**) para organizar filas de entrega e agilizar a conferência e preenchimento de dados de rastreio, pessoas e fotos no fluxo de trabalho do entregador.
 
-- o código de rastreio completo;
-- o mesmo código contendo somente os algarismos;
-- um nome fixo configurado pelo entregador.
+- **ID do aplicativo**: `com.alvaro.baixashopee`
+- **Nome do app**: Baixas de Pacote
+- **Nome do teclado**: Teclado das baixas
+- **Versão**: 0.8.0 (Build 9)
+- **Privacidade**: 100% local e offline (não requer permissão de internet nem envia dados a servidores).
 
-O projeto não acessa contas nem confirma entregas. O clique automático executa, somente depois de Play, a sequência de toques e deslizes criada pelo próprio usuário. É possível parar, editar, limpar, duplicar, importar e exportar perfis; a tela abaixo continua disponível para interação manual. A conferência e a confirmação final continuam manuais. Ele não solicita permissão de internet.
+---
 
-## Fluxo do teclado
+## 📱 Navegação em 4 Áreas
 
-Cada entrega permanece selecionada até os três dados serem inseridos. Cada botão muda para verde depois de usado. Quando os três ficarem verdes, a fila avança automaticamente para a próxima entrega.
+A partir da versão 0.8.0, o aplicativo organiza todas as funções em quatro abas principais:
 
-O nome da pessoa e o endereço aparecem na lista e no teclado somente quando existem. Eles podem vir da planilha importada ou da memória da casa; o aplicativo não mostra mais mensagens de “nome não encontrado”.
+### 1. 📦 ROTA
+- Visualização da fila do dia em tempo real com indicador duplo de progresso: **Pessoa X de Y** e **Pacote W de Z**.
+- Organização e ordenação flexível da fila:
+  - **Manual / Ordem de importação**;
+  - **Nome A-Z** (agrupamento estrito por destinatário literal; nomes inteiramente em maiúsculas são movidos para o bloco final da triagem);
+  - **Bairro** (com agrupamento inteligente de variantes como Cabuçu, Bom Jesus / Bom Jesus dos Pobres e Praia do Sol).
+- Ações rápidas na entrega: vincular casa salva, abrir no mapa e detalhes do pacote.
 
-Esse controle evita o erro mais perigoso do fluxo: o código completo de uma entrega ficar combinado com o código numérico da encomenda seguinte. Os botões **Voltar** e **Próxima** permitem corrigir a posição da fila. O botão **Teclado** retorna ao teclado normal do celular.
+### 2. 📷 FOTOS
+- Processamento de fotos em lote (até 50 fotos por vez) com proteção de memória e anti-duplicação por hash MD5.
+- **Identificação Offline**: Leitura automática de código de barras (1D e 2D) com fallback para OCR de texto via Google ML Kit incorporado.
+- Associação automática das fotos aos pacotes da rota.
+- Galeria de fotos pendentes com miniaturas e diálogo para atribuição manual de fotos não identificadas.
 
-## Importação
+### 3. 📂 ARQUIVO
+- **Entregas Concluídas**: Histórico de baixas com data/hora e atalho para **Desfazer**, retornando a entrega para a fila ativa caso haja engano.
+- **Memória de Casas Salvas**: Lista de residências com apelidos, moradores e fotos de fachada de referência.
+- **Exportação Excel**: Exportação da base de casas em formato `.csv` com codificação UTF-8 com BOM, compatível diretamente com Microsoft Excel e planilhas sem corromper acentos.
+- Relatórios de entrega em PDF individual.
 
-O aplicativo aceita:
+### 4. ⚙️ AJUSTES
+- Guia passo a passo para **Ativar** e **Selecionar** o **Teclado das baixas**.
+- Configuração do nome padrão do entregador / recebedor.
+- Ajuste de **altura do teclado** (220dp a 420dp).
+- Configuração do tempo de expiração da cópia temporária de fotos no MediaStore (padrão de 5 minutos).
+- Configurações do painel flutuante de autoclique assistido e diagnóstico do sistema.
 
-- `.xlsx` moderno, procurando automaticamente a aba que contém os rastreios;
-- `.csv` separado por ponto e vírgula, vírgula ou tabulação;
-- códigos colados, um por linha;
-- linhas coladas no formato `código; nome; endereço`.
+---
 
-O formato original de rota é reconhecido sem mudar a estrutura: `AT ID | Sequence | Stop | SPX TN | Destination Address | Bairro | City | Zipcode/Postal code | Latitude | Longitude`. `Sequence` é tratado como o nome da pessoa e `SPX TN` como o código de rastreio. Também continuam aceitos títulos como `Código de rastreio`, `Rastreio`, `Tracking`, `AWB`, `Nome`, `Destinatário`, `Endereço`, `Número`, `Bairro` e `Cidade`. Códigos repetidos são removidos mantendo a primeira ocorrência.
+## ⌨️ Teclado das baixas
 
-O botão **Exportar código + nome + endereço** gera um CSV enriquecido com os dez campos da rota, situação/ocorrência, memória da casa, GPS da fotografia, fotos e PDF.
+O teclado foi redesenhado com layout fixo, estável e ergonômico:
 
-## Memória de casas e rota do dia
+- **Indicador de Progresso Fixo**: Exibe a pessoa atual e o total de pessoas, além do pacote atual e total de pacotes (`Pessoa X/Y • Pacote W/Z`).
+- **Preenchimento em 1 Toque**:
+  - Código de rastreio completo (`SPX...`);
+  - Código numérico (somente os algarismos);
+  - Nome configurado do recebedor.
+- **Fotos Rápidas no MediaStore (TTL 5 min)**:
+  - Botões **Pacote** e **Casa**: criam uma cópia temporária da foto nos arquivos Recentes da Galeria do sistema (MediaStore). Isso permite selecionar a foto no aplicativo de entrega facilmente, sem alterar ou apagar o arquivo original, expirando automaticamente após 5 minutos.
+- **Navegação Segura**:
+  - Botões **Voltar** e **Próxima** para mover na fila.
+  - Botão **Desfazer**: reverte a última entrega concluída diretamente pelo teclado.
+  - Alternância rápida para o teclado alfanumérico padrão do sistema.
 
-O aplicativo agora separa dois conjuntos de dados:
+---
 
-- **rota do dia**: códigos, posição do teclado e foto de cada pacote;
-- **memória de casas**: apelido editável, moradores, endereço completo, link do mapa, observações e foto de referência da fachada.
+## 🗄️ Banco de Dados Local (Room)
 
-Use **Vincular casa** na entrega selecionada para escolher uma casa já salva ou cadastrar uma nova. Ao importar outra rota, um endereço completo e específico pode ser reconhecido e vinculado automaticamente. Endereços genéricos sem número não são vinculados automaticamente, evitando que várias casas sejam confundidas.
+O aplicativo utiliza o **Android Room** com migração automática e não-destrutiva a partir de versões anteriores:
+- Entidades separadas para rotas, destinatários, pacotes, casas salvas, histórico de entregas concluídas e fotos.
+- Preservação integral de todas as casas e moradores já cadastrados em versões legadas.
 
-O botão **Limpar rota** apaga somente a fila atual. Ele preserva a memória das casas e não remove fotos da galeria. Atualizar o APK por cima da versão instalada também preserva os dados; desinstalar o aplicativo apaga a memória interna.
+---
 
-## Fotos
+## 📥 Importação e Exportação
 
-Na tela principal, toque numa entrega e use:
+- **Formatos aceitos**:
+  - Planilhas `.xlsx` modernas (busca automática da aba de rastreios);
+  - Arquivos `.csv` (delimitadores `;`, `,` ou tabulação);
+  - Texto colado (códigos linha a linha ou formato `código; nome; endereço`).
+- **Estrutura de rota reconhecida**: `AT ID | Sequence | Stop | SPX TN | Destination Address | Bairro | City | Zipcode/Postal code | Latitude | Longitude`.
+- **Exportação**:
+  - Exportação de casas em CSV (UTF-8 BOM Excel).
+  - Exportação de relatório PDF individual em `Documentos/BaixaDaShopee/Entregas/CODIGO`.
 
-- **Foto do pacote**;
-- **Foto da fachada**.
+---
 
-O aplicativo usa uma câmera interna com prévia, **Tirar outra** e **Usar foto**. As imagens confirmadas são gravadas em `Imagens/Baixa da Shopee` com o código de rastreio no nome do arquivo. Quando há localização, latitude, longitude e horário também são gravados no EXIF quando o aparelho permite. A foto do pacote fica ligada à entrega atual; a foto da fachada fica ligada à casa permanente.
-
-Quando o par **pacote + fachada** fica completo, a tela seleciona automaticamente a próxima entrega para fotografar. Se a casa já tiver fachada salva, basta registrar o pacote novo. A seleção das fotos é independente da posição do teclado; **Começar o teclado nesta entrega** é a única ação da tela que muda a posição da fila do teclado.
-
-## Mapa e capturas da tela
-
-Em cada casa é possível salvar o link exato do Google Maps ou Waze. O botão **Abrir no mapa** prioriza o link da casa, depois Latitude/Longitude do arquivo original e, por último, pesquisa o endereço.
-
-## QR Code offline
-
-O botão **Escanear QR Code offline** abre a câmera interna. Depois da fotografia, o modelo incorporado ao APK lê o QR Code e procura o conteúdo na rota carregada. Ao encontrar o código de rastreio, seleciona diretamente o pacote no aplicativo e no teclado. O modelo não precisa ser baixado durante o percurso.
-
-Para relacionar códigos, nomes e endereços que aparecem somente no aplicativo oficial, use capturas longas em blocos de aproximadamente 5 a 8 entregas, repetindo uma entrega entre dois blocos consecutivos. Depois da leitura, importe no aplicativo o CSV enriquecido no formato `código; nome; endereço`. A leitura automática das próprias capturas dentro do celular ainda não faz parte desta versão.
-
-## Localização e relatório PDF
-
-Ao confirmar uma foto, o aplicativo tenta obter uma posição atual ou recente do GPS. Se a permissão for aceita e houver sinal, a entrega guarda latitude, longitude, precisão aproximada, data e horário. O endereço textual continua vindo da memória da casa ou da planilha; obter o nome da rua a partir do GPS pode exigir internet.
-
-O botão **Gerar PDF desta entrega** cria um relatório em `Documentos/BaixaDaShopee/Entregas/CODIGO`. A pasta recebe o PDF e cópias organizadas das fotos do pacote e da fachada. O relatório contém código, casa, pessoas, endereço, coordenada de destino, GPS real da fotografia, ocorrência, horário e imagens. Ele não substitui o comprovante nem a confirmação do aplicativo oficial.
-
-## Painel flutuante assistido
-
-O botão **▶ Painel** mostra o estado das duas autorizações e guia o usuário primeiro à sobreposição e depois diretamente ao serviço de acessibilidade. Existem três perfis editáveis e inicialmente vazios: **Baixar**, **Ocorrência** e **Tirar de ocorrência**. A barra permite adicionar alvo de toque, adicionar deslize A→B, remover o último alvo, arrastar pontos, editar atraso/duração e carregar outra configuração.
-
-Nenhum gesto começa durante o mapeamento. Somente **▶ Play** inicia a sequência salva. Durante a execução, os controles de edição ficam bloqueados, o botão se torna **■ Stop**, os marcadores deixam os toques manuais atravessarem para a tela abaixo e o perfil para por ciclos, tempo ou comando do usuário. Tocar no controle de mover recolhe ou expande a barra; arrastá-lo move o painel. Ao abrir o painel pela tela principal, sua posição é recuperada para dentro da área visível.
-
-Cada entrega possui o menu `⋮` somente para editar nome/endereço, colocar/alterar/remover ocorrência e excluir aquele item da rota. Perfis e definições de ocorrência ficam concentrados nas configurações do autoclique.
-
-As cores do painel estão centralizadas em `colors.xml`: `overlay_bg_color`, `primary_accent_color`, `secondary_accent_color`, `target_circle_color` e `text_primary_color`.
-
-O Android isola os aplicativos. Portanto, o teclado não consegue obter automaticamente uma foto tirada dentro do app da Shopee nem preencher um campo de câmera que não aceite a galeria. Isso depende do fluxo oferecido pelo aplicativo oficial.
-
-## Como instalar para teste
+## 🛠️ Como Instalar e Testar
 
 ### Pelo Android Studio
+1. Clone o repositório e abra no Android Studio com JDK 17+.
+2. Certifique-se de ter o Android SDK 36 e Build-Tools 36.0.0 instalados.
+3. Conecte o dispositivo via depuração USB e execute `Run` (ou gere o APK em `Build > Build Bundle(s) / APK(s) > Build APK(s)`).
 
-1. Instale uma versão atual do Android Studio com JDK 17.
-2. No SDK Manager, instale o Android SDK 36 e Build-Tools 36.0.0.
-3. Abra esta pasta como projeto.
-4. Aguarde a sincronização do Gradle.
-5. Conecte o celular com depuração USB e pressione **Run**.
+### Execução de Testes Unitários
+Para rodar a suíte completa de testes de regras de negócio:
+```bash
+./gradlew testDebugUnitTest
+```
 
-Para gerar um APK, use **Build > Build Bundle(s) / APK(s) > Build APK(s)**.
+---
 
-### Pelo GitHub Actions
-
-O arquivo `.github/workflows/build-apk.yml` compila e assina o APK ao enviar o projeto para o GitHub. Na aba **Actions**, execute **Gerar APK** e baixe o artefato `BaixaDaShopee-v0.7`.
-
-## Como ativar no celular
-
-1. Abra **Baixa da Shopee**.
-2. Salve o nome que está autorizado a ser inserido no fluxo de entrega.
-3. Importe a planilha ou cole os códigos.
-4. Toque em **Ativar teclado** e habilite **Baixa da Shopee** nas configurações do Android.
-5. Volte, toque em **Escolher teclado** e selecione **Baixa da Shopee**.
-6. No aplicativo oficial, toque no campo correto antes de usar cada botão do teclado.
-7. Cadastre/vincule casas conforme os endereços forem identificados.
-8. Confira código, pessoa, endereço e fotos antes da confirmação final.
-
-## Privacidade e uso autorizado
-
-Os dados ficam nas preferências privadas do aplicativo e as fotos ficam na pasta de imagens do aparelho. Não há envio para servidor. Use somente informações verdadeiras e procedimentos autorizados pela transportadora, pela plataforma e pelo destinatário. A foto da fachada salva é uma referência: use como comprovante atual somente se o procedimento da operação permitir. Se um campo estiver rotulado como documento de identidade, confirme com a supervisão qual dado deve ser registrado; este projeto não trata um código de rastreio como documento pessoal.
-
-## Próximas melhorias recomendadas
-
-- leitor de código de barras para selecionar automaticamente a entrega fotografada;
-- histórico diário separado por rota;
-- importação e leitura de capturas diretamente no aparelho;
-- exportação e restauração de uma cópia de segurança da memória de casas;
-- importação com escolha manual das colunas quando os títulos forem desconhecidos;
-- modo configurável para exigir dois ou três botões antes do avanço;
-- exportação de relatório de conferência sem declarar a entrega como concluída.
+## 🔒 Privacidade e Segurança
+Todos os dados e imagens são mantidos exclusivamente no armazenamento interno do aparelho. Nenhuma informação de rastreio, cliente ou localização é transmitida para a rede.
