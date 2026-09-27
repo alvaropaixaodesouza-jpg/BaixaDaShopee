@@ -1,0 +1,1296 @@
+Você vai continuar o desenvolvimento do aplicativo Android existente no repositório:
+
+alvaropaixaodesouza-jpg/BaixaDaShopee
+
+BRANCH DE TRABALHO:
+feature/v0.8-teclado-das-baixas
+
+OBJETIVO:
+Transformar a base atual na versão 0.8.0 de um aplicativo profissional chamado:
+
+BAIXAS DE PACOTE
+
+O serviço de teclado do Android deve aparecer como:
+
+TECLADO DAS BAIXAS
+
+IMPORTANTE:
+NÃO reescreva o aplicativo do zero.
+NÃO crie um segundo projeto.
+NÃO troque o applicationId.
+NÃO apague dados existentes.
+NÃO apague as casas já salvas.
+NÃO apague fotos permanentes.
+NÃO faça merge em main.
+NÃO descarte alterações locais existentes.
+
+Antes de modificar qualquer arquivo:
+
+1. Execute git status.
+2. Leia a arquitetura atual.
+3. Leia MainActivity, DeliveryStore, HouseStore, Delivery, DeliveryKeyboardService, CameraActivity, SpreadsheetImporter, FloatingAssistantService, AutomationAccessibilityService, layouts XML, Manifest e Gradle.
+4. Considere o working tree atual como fonte principal, pois existem alterações locais mais novas que a branch remota.
+5. Preserve tudo que já funciona.
+6. Só depois comece a implementação.
+
+==================================================
+1. IDENTIDADE E VERSÃO
+==================================================
+
+Nome visível do aplicativo:
+Baixas de Pacote
+
+Nome do teclado:
+Teclado das baixas
+
+Manter obrigatoriamente:
+applicationId = com.alvaro.baixashopee
+namespace = com.alvaro.baixashopee
+
+Versão:
+versionCode = 9
+versionName = 0.8.0
+
+O APK deve instalar por cima da versão anterior e preservar os dados do usuário.
+
+Substitua textos antigos como:
+"Baixa da Shopee"
+quando se referirem ao nome do aplicativo.
+
+Não altere package/applicationId.
+
+==================================================
+2. PRINCÍPIO DE ARQUITETURA
+==================================================
+
+O aplicativo deve deixar de ser uma tela gigante contendo configurações, fotos, rota e histórico ao mesmo tempo.
+
+Separar responsabilidades.
+
+Criar navegação principal profissional com quatro áreas:
+
+ROTA
+FOTOS
+ARQUIVO
+AJUSTES
+
+Pode ser navegação inferior ou solução equivalente adequada ao projeto atual.
+
+A tela principal deve abrir em ROTA.
+
+==================================================
+3. TELA ROTA
+==================================================
+
+A tela Rota é para trabalho diário.
+
+Mostrar de forma limpa:
+
+- nome Baixas de Pacote;
+- estado da rota;
+- quantidade de pendentes;
+- quantidade de concluídas;
+- entrega/destinatário atual;
+- lista da fila;
+- botão/importação da rota;
+- ordenação e filtro de bairro de forma discreta.
+
+REMOVER da Home:
+
+- chip Sobreposição;
+- chip Acessibilidade;
+- configuração técnica de automação;
+- lista enorme de Concluídas;
+- listas enormes de fotos;
+- configuração permanente do nome;
+- configurações técnicas.
+
+Essas funções continuarão existindo, mas em suas áreas corretas.
+
+==================================================
+4. AJUSTES / AUTOMAÇÃO
+==================================================
+
+Mover para:
+
+Ajustes > Automação
+
+as funções:
+
+- permissão de sobreposição;
+- permissão de acessibilidade;
+- abrir/configurar painel flutuante;
+- Play/Pausa;
+- perfis de automação;
+- ações relacionadas ao auto-click.
+
+As permissões não devem dominar a Home.
+
+O aplicativo deve verificar e solicitar essas permissões apenas quando a função que depende delas for utilizada.
+
+Preservar a automação já existente.
+
+==================================================
+5. FILA DE ENTREGAS
+==================================================
+
+A fila deve trabalhar conceitualmente com:
+
+DESTINATÁRIO
+   -> um ou vários PACOTES
+
+Um destinatário pode possuir vários códigos de rastreio.
+
+Pacotes da mesma pessoa devem ficar consecutivos.
+
+Mover uma pessoa na ordem manual deve mover todos os pacotes dela juntos.
+
+A fila e o teclado DEVEM usar exatamente a mesma fonte de dados e exatamente a mesma ordem.
+
+==================================================
+6. REGRA DE IDENTIDADE DO DESTINATÁRIO
+==================================================
+
+NÃO normalizar nome para decidir se duas pessoas são iguais.
+
+A comparação deve ser literal/exata.
+
+Exemplos:
+
+"João das Dores"
+é diferente de:
+"João Das Dores"
+
+"João das Dores"
+é diferente de:
+"JOÃO DAS DORES"
+
+"João das Dores"
+é diferente de:
+"Joao das Dores"
+
+Maiúsculas, minúsculas e acentos importam.
+
+Sequence vazio ou "-" não deve causar agrupamento indevido.
+
+Não usar fuzzy matching de nome.
+
+==================================================
+7. NOMES COMPLETAMENTE EM MAIÚSCULAS
+==================================================
+
+Destinatários cujo nome inteiro estiver em MAIÚSCULAS devem ir para um bloco final da fila.
+
+Exemplos:
+
+JOÃO DAS DORES -> bloco final
+MARIA SILVA 2 -> bloco final
+João das Dores -> normal
+JOÃO Silva -> normal
+
+A regra deve verificar letras Unicode.
+
+Números, espaços, hífens e pontuação não impedem a identificação.
+
+Mesmo usando ordenação A-Z, bairro ou manual, o bloco totalmente em maiúsculas continua depois dos destinatários normais.
+
+==================================================
+8. ORDENAÇÃO
+==================================================
+
+Disponibilizar:
+
+- Manual
+- Nome A-Z
+- Bairro
+
+Modo Manual:
+permitir drag-and-drop do bloco inteiro do destinatário.
+
+Persistir a ordem manual.
+
+Filtro/ordenação por bairro deve afetar tanto a lista quanto o teclado.
+
+==================================================
+9. NORMALIZAÇÃO ESPECIAL DE BAIRROS
+==================================================
+
+ATENÇÃO:
+Essa normalização vale SOMENTE para o campo bairro/filtro de bairro.
+
+NÃO usar essa lógica em nome de destinatário.
+
+Criar uma chave normalizada interna para bairro.
+
+Para comparar bairros:
+
+- trim;
+- lowercase;
+- remover acentos apenas para comparação;
+- ignorar pontuação;
+- ignorar espaços duplicados;
+- permitir reconhecer variantes razoáveis.
+
+Mapeamento especial:
+
+Qualquer variante do bairro contendo "cabucu" deve ser agrupada em:
+
+Cabuçu
+
+Exemplos que devem cair no mesmo grupo:
+
+Cabuçu
+CABUÇU
+cabucu
+Cabuçu.
+Cabuçu -
+Cabuçu com espaços extras
+
+Para Bom Jesus:
+
+"Bom Jesus"
+e
+"Bom Jesus dos Pobres"
+
+representam o MESMO grupo de bairro.
+
+Também aceitar variações de maiúsculas, acentos, espaços e pontuação.
+
+O grupo visual pode ser chamado:
+
+Bom Jesus
+
+ou:
+
+Bom Jesus / Bom Jesus dos Pobres
+
+mas internamente deve ser uma única categoria.
+
+Praia do Sol:
+se existir, manter como Praia do Sol.
+
+Qualquer outro bairro:
+não apagar nem forçar para Cabuçu/Bom Jesus.
+Preservar como categoria própria.
+
+IMPORTANTE:
+Não procurar "Cabuçu" ou "Bom Jesus" no endereço inteiro.
+Usar prioritariamente o campo de BAIRRO da planilha.
+Isso evita classificar uma rua incorretamente.
+
+==================================================
+10. FLUXO COM VÁRIOS PACOTES DA MESMA PESSOA
+==================================================
+
+O teclado NÃO pode avançar de destinatário a cada código.
+
+Exemplo:
+
+João:
+BR001
+BR002
+BR003
+
+Maria:
+BR004
+
+Fluxo correto:
+
+João / pacote 1 de 3
+João / pacote 2 de 3
+João / pacote 3 de 3
+somente então:
+Maria / pacote 1 de 1
+
+Concluir um pacote deve avançar para o próximo pacote da mesma pessoa.
+
+Somente após o último pacote avançar para a próxima pessoa.
+
+Nunca misturar código de um destinatário com nome de outro.
+
+==================================================
+11. CONCLUÍDAS
+==================================================
+
+Entrega concluída deve:
+
+- sair imediatamente da fila ativa;
+- sair do teclado;
+- não receber mais automação;
+- permanecer registrada no histórico;
+- continuar concluída mesmo se o aplicativo fechar/reiniciar.
+
+Criar área:
+
+Arquivo > Concluídas
+
+NÃO renderizar a lista inteira de concluídas na Home.
+
+Usar RecyclerView/lista virtualizada para não travar com centenas ou milhares de registros.
+
+Cada item de Concluídas deve mostrar:
+
+CÓDIGO DE RASTREIO
+NOME DO DESTINATÁRIO
+ENDEREÇO
+
+E ao lado:
+
+DESFAZER
+
+Exemplo visual:
+
+BR261008765178U
+JOÃO DAS DORES
+Rua X, 123 - Cabuçu                 [Desfazer]
+
+==================================================
+12. PESQUISA EM CONCLUÍDAS
+==================================================
+
+Adicionar uma lupa no topo da tela Concluídas.
+
+Ao tocar, permitir pesquisa.
+
+Pesquisar por:
+
+- código BR completo;
+- parte do código;
+- nome;
+- endereço.
+
+O principal objetivo é permitir digitar o rastreio de uma entrega baixada por engano e encontrá-la imediatamente.
+
+A busca deve ocorrer sem carregar milhares de Views.
+
+==================================================
+13. DESFAZER CONCLUSÃO
+==================================================
+
+Existirão DUAS formas.
+
+FORMA 1:
+Após concluir uma entrega, mostrar ação discreta:
+
+Desfazer
+
+por alguns segundos.
+
+FORMA 2:
+Arquivo > Concluídas
+pesquisar o código
+tocar em Desfazer.
+
+Ao restaurar:
+
+- remover estado de concluída;
+- devolver à fila ativa;
+- devolver à posição lógica correta;
+- se a pessoa ainda possui outros pacotes ativos, reinserir no bloco dela;
+- não simplesmente jogar no fim da fila.
+
+Reimportar a rota NÃO deve reativar automaticamente entregas já concluídas.
+
+==================================================
+14. BOTÃO DESFAZER NO TECLADO
+==================================================
+
+Adicionar um botão FIXO:
+
+DESFAZER
+
+dentro do Teclado das baixas.
+
+Esse botão deve existir visualmente desde o momento em que o teclado abre.
+
+Ele NÃO pode aparecer somente depois de alguma ação.
+
+Quando não houver uma conclusão que possa ser desfeita:
+
+- botão continua ocupando exatamente o mesmo espaço;
+- pode ficar visualmente desativado.
+
+Quando existir uma última conclusão reversível:
+
+Desfazer restaura a última entrega concluída pelo fluxo do teclado.
+
+Essa operação deve atualizar:
+
+- banco;
+- fila;
+- destinatário/pacote atual;
+- interface do aplicativo;
+- teclado.
+
+==================================================
+15. TECLADO DAS BAIXAS
+==================================================
+
+Redesenhar o teclado para ser compacto, fixo e previsível.
+
+TODOS os controles principais devem existir assim que o teclado abrir.
+
+Nenhum botão importante deve aparecer/desaparecer alterando a altura.
+
+Elementos obrigatórios:
+
+- progresso da pessoa;
+- progresso do pacote;
+- nome do destinatário;
+- endereço;
+- BR;
+- RG;
+- Nome;
+- Pacote;
+- Casa;
+- Desfazer;
+- Anterior;
+- Próximo;
+- trocar teclado.
+
+Exemplo conceitual:
+
+Pessoa 12/87 • Pacote 2/3
+JOÃO DAS DORES
+Rua X, 123
+
+[ BR ] [ RG ] [ Nome ]
+
+[ Pacote ] [ Casa ] [ Desfazer ]
+
+[ ← ] [ Próximo ] [ Teclado ]
+
+Não precisa copiar exatamente essa distribuição se houver solução visual melhor, mas preserve todos os controles visíveis e em posições fixas.
+
+==================================================
+16. BR, RG E NOME
+==================================================
+
+BR:
+insere o código completo/canônico da entrega atual.
+
+RG:
+insere somente a parte numérica usada na operação.
+
+IMPORTANTE:
+A parte numérica serve apenas para colagem.
+
+NÃO usar RG/números como identidade interna do pacote.
+
+Internamente o pacote deve continuar identificado pelo código canônico completo.
+
+Nome:
+usar conforme configuração.
+
+Opções:
+
+- usar Sequence;
+- usar nome alternativo/fallback.
+
+O fallback é um campo editável pelo usuário.
+
+Não é um nome fixo no código.
+
+==================================================
+17. NOME DO DESTINATÁRIO X MORADORES DA CASA
+==================================================
+
+Corrigir a arquitetura atual.
+
+O teclado deve mostrar como nome principal:
+
+currentDelivery.customerName / destinatário atual.
+
+NÃO substituir o nome do destinatário por house.residents.
+
+Exemplo:
+
+Uma casa pode ter:
+João • Maria • Pedro
+
+Se o pacote é de Maria:
+o teclado deve mostrar MARIA.
+
+Moradores conhecidos da casa podem ser informação auxiliar, nunca substituição do destinatário.
+
+==================================================
+18. ALTURA DO TECLADO
+==================================================
+
+O teclado deve manter uma altura estável durante o uso.
+
+Não aumentar nem diminuir porque um botão foi utilizado.
+
+Adicionar:
+
+Ajustes > Teclado > Altura do teclado
+
+Pode usar Slider/SeekBar ou controle adequado.
+
+Persistir preferência.
+
+Definir:
+
+- altura mínima segura;
+- altura máxima segura.
+
+Nunca permitir uma altura tão pequena que esconda os controles principais.
+
+Opcionalmente permitir ajuste de:
+
+- escala dos textos;
+- escala dos botões;
+
+sem alterar a posição lógica dos comandos.
+
+==================================================
+19. BOTÕES PACOTE E CASA NO TECLADO
+==================================================
+
+NÃO mostrar fotografia dentro do teclado.
+
+Criar dois botões quadrados/fixos ou equivalentes:
+
+PACOTE
+CASA
+
+Eles permanecem permanentemente na mesma posição.
+
+Isso evita carregar Bitmap dentro do teclado e evita alteração do tamanho.
+
+==================================================
+20. ARMAZENAMENTO DE FOTOS
+==================================================
+
+Não armazenar o arquivo binário completo da fotografia diretamente no banco Room.
+
+Usar:
+
+BANCO:
+metadados, IDs, URI/path, tipo, pacote, casa, timestamps.
+
+ARMAZENAMENTO PRIVADO DO APP:
+arquivos de imagem permanentes/temporários conforme o tipo.
+
+Foto do pacote:
+ligada ao pacote/tracking code.
+
+Foto da casa:
+ligada permanentemente à casa/endereço.
+
+Casa e pacote são entidades diferentes.
+
+==================================================
+21. AÇÃO PACOTE/CASA NO TECLADO
+==================================================
+
+Ao tocar PACOTE:
+
+1. localizar a foto do pacote atual;
+2. criar uma cópia temporária no MediaStore/Pictures;
+3. marcar timestamp atual;
+4. fazer a imagem aparecer entre as fotos recentes do Android;
+5. permitir que o usuário escolha essa imagem no aplicativo externo da baixa.
+
+Ao tocar CASA:
+
+mesmo fluxo, mas usando a foto da casa correspondente.
+
+NÃO usar clipboard de imagem.
+
+NÃO mover o original.
+
+==================================================
+22. EXPIRAÇÃO DAS FOTOS TEMPORÁRIAS
+==================================================
+
+A cópia criada no MediaStore é TEMPORÁRIA.
+
+TTL desejado:
+
+aproximadamente 5 minutos.
+
+Depois disso, remover a cópia temporária.
+
+Nunca apagar o original da casa.
+
+Nunca apagar equivocadamente o original do pacote.
+
+Controlar as URIs que o próprio aplicativo criou.
+
+Implementar limpeza resiliente:
+
+- limpeza programada;
+- limpeza ao reabrir o app;
+- limpeza de itens expirados após reinicialização.
+
+Pode usar WorkManager/AlarmManager/cleanup-on-launch conforme apropriado.
+
+Android pode não garantir exatamente segundo 300; garantir expiração aproximada e limpeza eventual.
+
+==================================================
+23. FOTOS DOS PACOTES
+==================================================
+
+Área principal:
+
+Fotos
+
+Ter duas ações claras:
+
+TIRAR FOTOS DOS PACOTES
+
+SELECIONAR DA GALERIA — ATÉ 50
+
+Galeria:
+permitir seleção de até 50 imagens por operação.
+
+NÃO decodificar 50 imagens completas simultaneamente.
+
+Processar:
+
+- uma a uma;
+ou
+- concorrência muito baixa.
+
+Liberar memória depois de processar cada imagem.
+
+Mostrar progresso:
+
+17 / 50
+
+Ao final mostrar algo como:
+
+50 processadas
+43 atribuídas automaticamente
+7 sem destinatário
+
+==================================================
+24. RECONHECIMENTO AUTOMÁTICO DAS FOTOS
+==================================================
+
+Para cada fotografia:
+
+PRIMEIRO:
+ler QR/barcode.
+
+SEGUNDO:
+extrair código de rastreio.
+
+TERCEIRO:
+comparar com códigos canônicos da rota.
+
+A correspondência deve ser determinística e segura.
+
+Não atribuir usando aproximação de nome.
+
+Se barcode não funcionar:
+
+usar OCR como fallback.
+
+Adicionar dependência ML Kit Text Recognition se ainda não existir.
+
+Se houver correspondência EXATA e ÚNICA:
+atribuir automaticamente ao pacote.
+
+Se:
+
+- código ilegível;
+- código não encontrado;
+- mais de uma possibilidade;
+- leitura inconsistente;
+
+NÃO ADIVINHAR.
+
+Mover para:
+
+Fotos sem destinatário.
+
+==================================================
+25. CORRESPONDÊNCIA DO RASTREIO
+==================================================
+
+Criar índice conceitual:
+
+trackingCode canônico
+    -> Package/Delivery
+
+Evitar lógica insegura como simplesmente:
+
+haystack.contains(code)
+
+quando isso puder gerar falso positivo.
+
+Para associação automática de fotografia utilizar igualdade canônica exata após extração/normalização apropriada do código.
+
+Não remover letras para identidade.
+
+==================================================
+26. FOTOS SEM DESTINATÁRIO
+==================================================
+
+NÃO criar uma linha enorme por foto com botão gigante.
+
+Criar grade:
+
+3 COLUNAS.
+
+Usar RecyclerView + GridLayoutManager ou arquitetura equivalente.
+
+Mostrar miniaturas leves.
+
+NÃO carregar a imagem original full-size na grade.
+
+Topo:
+
+X fotos sem destinatário
+
+Opcionalmente filtros úteis:
+
+Todos
+Sem leitura
+Código não encontrado
+Ambíguos
+
+==================================================
+27. VISUALIZADOR DAS FOTOS PENDENTES
+==================================================
+
+Ao tocar uma miniatura:
+
+abrir visualização maior.
+
+Permitir swipe horizontal:
+
+anterior / próxima.
+
+No rodapé:
+
+ATRIBUIR A UM DESTINATÁRIO
+
+Ao tocar:
+
+abrir seletor pesquisável de destinatários/pacotes da rota.
+
+Mostrar dados suficientes para não confundir pessoas.
+
+Confirmar com OK.
+
+Após atribuir:
+
+- salvar vínculo;
+- remover da fila de pendentes;
+- abrir automaticamente a próxima foto pendente.
+
+==================================================
+28. FOTOS DUPLICADAS
+==================================================
+
+Evitar importar a mesma fotografia várias vezes acidentalmente.
+
+Criar mecanismo por:
+
+- URI;
+- hash;
+ou
+- identificador estável apropriado.
+
+Se já foi processada, sinalizar duplicidade em vez de criar cópia desnecessária.
+
+==================================================
+29. PROCESSAMENTO RECUPERÁVEL
+==================================================
+
+Se o usuário selecionar 50 fotos e o Android matar o processo na foto 31:
+
+não perder todo o progresso.
+
+Persistir estado suficiente para:
+
+- continuar;
+ou
+- mostrar quais imagens ainda faltam.
+
+==================================================
+30. CASAS SALVAS
+==================================================
+
+Casas salvas são dados PERMANENTES.
+
+Rota do dia é TEMPORÁRIA.
+
+Ao importar uma nova rota:
+
+para cada endereço específico:
+
+1. gerar chave normalizada de endereço;
+2. procurar casa existente;
+3. se existir, reaproveitar;
+4. NÃO sobrescrever dados permanentes;
+5. se não existir, criar casa nova automaticamente.
+
+O usuário não deve precisar cadastrar manualmente cada endereço.
+
+==================================================
+31. NORMALIZAÇÃO DE ENDEREÇO
+==================================================
+
+A normalização de endereço é DIFERENTE da regra de nome.
+
+Pode:
+
+- trim;
+- normalizar espaços;
+- ignorar caixa;
+- tratar pontuação cuidadosamente;
+
+para evitar duplicatas.
+
+Mas deve ter proteção contra endereços genéricos.
+
+Não criar uma única casa chamada apenas:
+
+Cabuçu
+Bom Jesus
+Saubara
+Rua sem número
+
+se não houver informação específica suficiente.
+
+Preservar o texto original para exibição.
+
+==================================================
+32. VÁRIAS PESSOAS NA MESMA CASA
+==================================================
+
+Casa identifica localização, não pessoa.
+
+João e Maria no mesmo endereço:
+
+UMA House
+
+mas destinatários diferentes.
+
+A casa pode guardar moradores conhecidos separadamente.
+
+Foto da casa é compartilhada pelo endereço.
+
+==================================================
+33. LIMPAR ROTA
+==================================================
+
+"Limpar rota" deve remover:
+
+- rota ativa;
+- pacotes temporários;
+- associações temporárias da rota;
+- fotos temporárias de pacote conforme política.
+
+NÃO apagar:
+
+- Casas salvas;
+- fotos permanentes das casas;
+- histórico permanente apropriado;
+- configurações.
+
+Excluir casas deve existir somente em ação específica de Casas salvas.
+
+==================================================
+34. EXPORTAR CASAS PARA PLANILHA
+==================================================
+
+Adicionar em:
+
+Arquivo > Casas salvas
+
+ação:
+
+EXPORTAR CASAS
+
+Objetivo:
+permitir que o usuário abra posteriormente a planilha e preencha/corrija nomes e dados com facilidade.
+
+Gerar Excel/CSV seguindo o formato mais compatível possível com a planilha que o aplicativo já importa.
+
+Reutilizar, quando aplicável:
+
+- nomes de colunas;
+- ordem de campos;
+- endereço;
+- bairro;
+- cidade;
+- CEP;
+- nome/residentes;
+- demais informações de localização disponíveis.
+
+IMPORTANTE:
+
+Casa não é pacote.
+
+Não inventar código de rastreio falso.
+
+Campos exclusivos de pacote/rastreamento devem ficar vazios quando não forem aplicáveis.
+
+A exportação não deve destruir nem modificar os dados existentes.
+
+O motivo dessa exportação é facilitar edição manual dos nomes das casas no Excel.
+
+Não misturar esta exportação com a rota ativa.
+
+Criar nome de arquivo claro, por exemplo:
+
+casas_salvas_2026-09-26.xlsx
+
+ou CSV equivalente se XLSX não estiver disponível.
+
+Preferencialmente gerar XLSX se já houver suporte seguro; caso contrário CSV UTF-8 compatível com Excel.
+
+==================================================
+35. MÚLTIPLAS FOTOS POR PACOTE
+==================================================
+
+O modelo atual com apenas:
+
+packagePhotoUri
+
+não é suficiente para crescimento futuro.
+
+Permitir relação um-para-muitos:
+
+Package
+    -> Photos
+
+Se várias imagens forem identificadas para o mesmo pacote, preservar todas.
+
+No teclado o botão PACOTE pode usar uma foto principal/mais recente, sem renderizar as imagens diretamente.
+
+==================================================
+36. BANCO DE DADOS
+==================================================
+
+A aplicação já ultrapassou o tamanho adequado para manter toda a estrutura complexa em um JSON enorme dentro de SharedPreferences.
+
+Migrar gradualmente os dados estruturados para Room.
+
+NÃO fazer migração destrutiva.
+
+Criar entidades adequadas, por exemplo:
+
+Route
+Recipient
+Package
+House
+Photo
+CompletedDelivery
+
+e outras somente se realmente necessárias.
+
+Usar relacionamentos/IDs consistentes.
+
+SharedPreferences/DataStore fica para preferências simples:
+
+- altura do teclado;
+- modo do nome;
+- ordem escolhida;
+- filtros;
+- configurações visuais;
+- preferências pequenas.
+
+==================================================
+37. MIGRAÇÃO DOS DADOS ANTIGOS
+==================================================
+
+EXTREMAMENTE IMPORTANTE:
+
+Já existem centenas de casas salvas.
+
+A atualização NÃO pode apagá-las.
+
+Na primeira execução da nova arquitetura:
+
+- detectar dados antigos;
+- importar/migrar para Room;
+- validar quantidade;
+- marcar migração concluída;
+- manter mecanismo seguro para evitar executar duas vezes.
+
+Se a migração falhar:
+
+não apagar dados antigos.
+
+Preferencialmente criar backup/checkpoint antes da migração.
+
+==================================================
+38. ÁREA ARQUIVO
+==================================================
+
+Arquivo deve conter pelo menos:
+
+CASAS SALVAS
+CONCLUÍDAS
+
+Casas salvas:
+- busca;
+- foto;
+- endereço;
+- moradores;
+- edição;
+- exportar planilha.
+
+Concluídas:
+- busca/lupa;
+- código;
+- nome;
+- endereço;
+- desfazer.
+
+==================================================
+39. NOME USADO NA BAIXA
+==================================================
+
+Mover configuração para Ajustes.
+
+Permitir:
+
+USAR SEQUENCE
+ou
+USAR NOME ALTERNATIVO
+
+Nome alternativo é campo editável.
+
+Quando Sequence estiver ausente ou inválido, obedecer a regra de fallback definida.
+
+O teclado deve deixar claro qual nome será inserido.
+
+==================================================
+40. INTERFACE PROFISSIONAL
+==================================================
+
+A Home não deve parecer painel de desenvolvedor/configuração.
+
+Evitar:
+
+- dezenas de botões gigantes;
+- listas inteiras renderizadas dentro de ScrollView;
+- permissões técnicas no cabeçalho;
+- informações técnicas misturadas à operação.
+
+Usar hierarquia visual consistente.
+
+Rota = operação.
+Fotos = fotografia.
+Arquivo = dados históricos.
+Ajustes = configuração.
+
+Manter visual limpo, arredondado e coerente com o design já existente, mas profissionalizar espaçamentos, hierarquia, tamanhos e navegação.
+
+==================================================
+41. PERFORMANCE
+==================================================
+
+Eliminar criação de centenas de Views manualmente para listas grandes.
+
+Usar RecyclerView/Lazy loading quando apropriado.
+
+Em especial:
+
+- Concluídas;
+- Rota;
+- Casas;
+- Fotos sem destinatário.
+
+Miniaturas devem ser dimensionadas.
+
+Nunca manter dezenas de bitmaps full-size simultaneamente.
+
+Evitar processamento pesado na UI thread.
+
+==================================================
+42. DIAGNÓSTICO
+==================================================
+
+Adicionar em Ajustes:
+
+DIAGNÓSTICO
+
+Mostrar:
+
+- versão;
+- quantidade de casas;
+- pacotes ativos;
+- destinatários ativos;
+- concluídas;
+- fotos pendentes;
+- fila de processamento;
+- temporários;
+- status do banco;
+- última importação.
+
+Adicionar opção de exportar diagnóstico técnico quando possível.
+
+Não incluir fotos ou informações sensíveis desnecessariamente.
+
+==================================================
+43. FRONTEND X BACKEND
+==================================================
+
+Faça uma auditoria de todas as funções existentes.
+
+Para cada botão/controle exibido no frontend:
+
+verifique se existe implementação real correspondente.
+
+Para cada função importante existente no backend:
+
+verifique se existe forma correta de acessá-la pela interface.
+
+Remover ou corrigir:
+
+- botão fictício;
+- botão sem listener;
+- tela que só aparenta funcionar;
+- função backend inacessível;
+- opção duplicada;
+- código morto;
+- estados inconsistentes.
+
+Não apagar funcionalidade útil apenas porque a UI ainda está ruim.
+
+==================================================
+44. TESTES OBRIGATÓRIOS
+==================================================
+
+Criar/testar cenários:
+
+1. João com 3 pacotes e Maria com 1.
+2. João Silva diferente de JOÃO SILVA.
+3. Nome Sequence vazio.
+4. Nome totalmente em maiúsculas.
+5. Duas pessoas na mesma casa.
+6. Cabuçu / CABUÇU / cabucu / Cabuçu. = mesmo bairro.
+7. Bom Jesus e Bom Jesus dos Pobres = mesmo bairro.
+8. Praia do Sol permanece própria.
+9. Bairro desconhecido permanece próprio.
+10. Concluir entrega.
+11. Desfazer imediatamente.
+12. Buscar concluída por BR.
+13. Buscar concluída por nome.
+14. Buscar concluída por endereço.
+15. Restaurar concluída e devolver à posição correta.
+16. Reabrir app e concluída continuar concluída.
+17. Reimportar rota sem reativar concluídas.
+18. Selecionar 50 fotos.
+19. Código encontrado automaticamente.
+20. Código ilegível.
+21. Código inexistente.
+22. Código ambíguo.
+23. Mesma foto importada duas vezes.
+24. Fechar app durante processamento.
+25. Casa reutilizada em rota posterior.
+26. Limpar rota preservando casas.
+27. Exportar casas.
+28. Teclado altura mínima.
+29. Teclado altura máxima.
+30. Todos os botões permanecerem nas mesmas posições.
+31. Pacote/Casa exportarem cópia temporária para MediaStore.
+32. Cópia temporária expirar sem apagar original.
+33. Desfazer fixo continuar visível mesmo desabilitado.
+34. Rotação/reabertura não corromper estado.
+35. Atualização por cima preservar dados antigos.
+
+==================================================
+45. ORDEM DE IMPLEMENTAÇÃO
+==================================================
+
+Não tente alterar tudo aleatoriamente.
+
+Siga esta ordem:
+
+FASE 1
+Auditoria do projeto e backup/checkpoint.
+
+FASE 2
+Modelo de dados / Room / migração segura.
+
+FASE 3
+Fila, destinatários, pacotes, bairros e ordenação.
+
+FASE 4
+Conclusões, busca e desfazer.
+
+FASE 5
+Casas salvas e exportação.
+
+FASE 6
+Fotos, galeria, barcode, OCR e pendentes.
+
+FASE 7
+MediaStore temporário.
+
+FASE 8
+Novo teclado fixo.
+
+FASE 9
+Nova navegação/UI.
+
+FASE 10
+Automação/Ajustes/diagnóstico.
+
+FASE 11
+Testes.
+
+FASE 12
+Build APK.
+
+==================================================
+46. REGRAS DE SEGURANÇA DA IMPLEMENTAÇÃO
+==================================================
+Se uma mudança depender de outra, implemente a dependência primeiro.
+
+Não crie atalhos que possam causar mistura de destinatários.
+
+Não use nome aproximado para atribuir pacote.
+
+Não use somente números do rastreio como identidade.
+
+Não sobrescreva casas existentes.
+
+Não reative concluídas por acidente.
+
+Não apagar dados quando ocorrer exceção.
+
+Não fazer destructiveMigration do Room.
+
+Não fazer merge em main.
+
+Não modificar applicationId.
+
+Não substituir o projeto inteiro por arquitetura nova desnecessariamente.
+
+Evoluir a base existente.
+
+==================================================
+47. FINALIZAÇÃO
+==================================================
+
+Ao terminar:
+
+1. Execute os testes possíveis.
+2. Execute build debug.
+3. Corrija todos os erros de compilação.
+4. Execute novamente o build.
+5. Mostre um relatório indicando:
+   - arquivos alterados;
+   - funções implementadas;
+   - funções ainda pendentes;
+   - migrações realizadas;
+   - riscos encontrados;
+   - testes realizados;
+   - resultado do build.
+6. Mostre git status.
+7. Mostre git diff --stat.
+8. NÃO faça merge em main.
+9. NÃO apague alterações locais.
+10. Não declare uma funcionalidade pronta se ela existir apenas visualmente.
+
+A versão só deve ser considerada pronta quando frontend, backend, persistência e fluxo real estiverem conectados e testados.

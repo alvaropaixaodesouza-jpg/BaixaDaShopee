@@ -6,356 +6,835 @@
     android:fitsSystemWindows="true"
     android:orientation="vertical">
 
+    <!-- Top App Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@drawable/header_gradient"
         android:orientation="vertical"
-        android:paddingStart="20dp"
-        android:paddingTop="17dp"
-        android:paddingEnd="20dp"
-        android:paddingBottom="17dp">
+        android:paddingStart="18dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="14dp">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Baixa da Shopee"
-            android:textColor="@color/white"
-            android:textSize="26sp"
-            android:textStyle="bold" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Baixas de Pacote"
+                android:textColor="@color/white"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/headerImportBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:background="@drawable/chip_neutral"
+                android:text="📥 Importar"
+                android:textAllCaps="false"
+                android:textColor="@color/white"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/summaryText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
-            android:text="Nenhuma lista carregada"
+            android:layout_marginTop="2dp"
+            android:text="Nenhuma rota carregada"
             android:textColor="#FFF1EC"
-            android:textSize="14sp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/overlayPermissionChip"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:background="@drawable/chip_neutral"
-                android:gravity="center"
-                android:text="○ Sobreposição"
-                android:textColor="@color/white"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-            <Space android:layout_width="7dp" android:layout_height="1dp" />
-
-            <TextView
-                android:id="@+id/accessibilityPermissionChip"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:background="@drawable/chip_neutral"
-                android:gravity="center"
-                android:text="○ Acessibilidade"
-                android:textColor="@color/white"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-            <Space android:layout_width="7dp" android:layout_height="1dp" />
-
-            <TextView
-                android:id="@+id/openPanelButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/chip_neutral"
-                android:gravity="center"
-                android:text="▶ Painel"
-                android:textColor="@color/white"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-        </LinearLayout>
+            android:textSize="13sp" />
     </LinearLayout>
 
-    <ScrollView
-        android:id="@+id/mainScroll"
+    <!-- Content Area (Holds the 4 main sections) -->
+    <FrameLayout
+        android:id="@+id/mainContentFrame"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:clipToPadding="false"
-        android:fillViewport="true">
+        android:layout_height="0dp"
+        android:layout_weight="1">
 
+        <!-- ==================== ABA 1: ROTA ==================== -->
         <LinearLayout
+            android:id="@+id/tabRouteLayout"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:orientation="vertical"
-            android:paddingStart="14dp"
-            android:paddingTop="14dp"
-            android:paddingEnd="14dp"
-            android:paddingBottom="28dp">
+            android:visibility="visible">
 
+            <!-- Card de Entrega Atual Selecionada -->
             <LinearLayout
+                android:id="@+id/currentDeliveryCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_margin="10dp"
                 android:background="@drawable/panel"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:padding="12dp">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Seu nome para o preenchimento"
-                    android:textColor="@color/ink"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <EditText
-                    android:id="@+id/receiverNameInput"
+                <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/field_soft"
-                    android:hint="Nome autorizado do recebedor"
-                    android:inputType="textPersonName"
-                    android:maxLines="1"
-                    android:textColor="@color/ink"
-                    android:paddingStart="13dp"
-                    android:paddingEnd="13dp"
-                    android:textColorHint="@color/muted" />
-
-                <Button
-                    android:id="@+id/saveNameButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:layout_marginTop="7dp"
-                    android:background="@drawable/button_primary"
-                    android:text="Salvar nome"
-                    android:textAllCaps="false"
-                    android:textColor="@color/white"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
-            <Button
-                android:id="@+id/scanQrButton"
-                android:layout_width="match_parent"
-                android:layout_height="54dp"
-                android:layout_marginTop="12dp"
-                android:background="@drawable/button_secondary"
-                android:text="▣  Escanear QR Code offline"
-                android:textAllCaps="false"
-                android:textColor="@color/orange_dark"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="9dp"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/importButton"
-                    android:layout_width="0dp"
-                    android:layout_height="54dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/button_primary"
-                    android:text="＋ Importar Excel/CSV"
-                    android:textAllCaps="false"
-                    android:textColor="@color/white"
-                    android:textStyle="bold" />
-
-                <Space android:layout_width="9dp" android:layout_height="1dp" />
-
-                <Button
-                    android:id="@+id/moreButton"
-                    android:layout_width="72dp"
-                    android:layout_height="54dp"
-                    android:background="@drawable/button_secondary"
-                    android:contentDescription="Mais ferramentas"
-                    android:text="•••"
-                    android:textAllCaps="false"
-                    android:textColor="@color/orange_dark"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/selectedDeliveryCard"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:background="@drawable/panel"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="ENTREGA SELECIONADA"
-                    android:textColor="@color/orange_dark"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/currentDeliveryLabel"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Entrega Selecionada"
+                        android:textColor="@color/ink"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/useInKeyboardButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="34dp"
+                        android:background="@drawable/button_secondary"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        android:text="Iniciar teclado aqui"
+                        android:textAllCaps="false"
+                        android:textColor="@color/orange_dark"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/currentDeliveryText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="7dp"
-                    android:text="Importe uma lista para começar."
+                    android:layout_marginTop="4dp"
                     android:textColor="@color/ink"
-                    android:textIsSelectable="true"
-                    android:textSize="15sp" />
+                    android:textSize="13sp" />
 
+                <!-- Ações rápidas da entrega -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="8dp"
                     android:orientation="horizontal">
 
                     <Button
                         android:id="@+id/packagePhotoButton"
                         android:layout_width="0dp"
-                        android:layout_height="52dp"
+                        android:layout_height="40dp"
                         android:layout_weight="1"
-                        android:background="@drawable/button_primary"
-                        android:text="Foto do pacote"
+                        android:background="@drawable/button_secondary"
+                        android:text="📦 Foto Pacote"
                         android:textAllCaps="false"
-                        android:textColor="@color/white"
-                        android:textStyle="bold" />
+                        android:textColor="@color/ink"
+                        android:textSize="12sp" />
 
-                    <Space android:layout_width="8dp" android:layout_height="1dp" />
+                    <Space android:layout_width="6dp" android:layout_height="1dp" />
 
                     <Button
                         android:id="@+id/facadePhotoButton"
                         android:layout_width="0dp"
-                        android:layout_height="52dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/button_primary"
-                        android:text="Foto da fachada"
-                        android:textAllCaps="false"
-                        android:textColor="@color/white"
-                        android:textStyle="bold" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="7dp"
-                    android:orientation="horizontal">
-
-                    <ImageView
-                        android:id="@+id/packagePreview"
-                        android:layout_width="0dp"
-                        android:layout_height="92dp"
-                        android:layout_weight="1"
-                        android:contentDescription="Prévia da foto do pacote"
-                        android:scaleType="centerCrop"
-                        android:visibility="gone" />
-                    <Space android:layout_width="8dp" android:layout_height="1dp" />
-                    <ImageView
-                        android:id="@+id/facadePreview"
-                        android:layout_width="0dp"
-                        android:layout_height="92dp"
-                        android:layout_weight="1"
-                        android:contentDescription="Prévia da foto da fachada"
-                        android:scaleType="centerCrop"
-                        android:visibility="gone" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:orientation="horizontal">
-                    <Button
-                        android:id="@+id/linkHouseButton"
-                        android:layout_width="0dp"
-                        android:layout_height="50dp"
+                        android:layout_height="40dp"
                         android:layout_weight="1"
                         android:background="@drawable/button_secondary"
-                        android:text="Vincular casa"
+                        android:text="🏠 Foto Casa"
                         android:textAllCaps="false"
-                        android:textColor="@color/orange_dark"
-                        android:textStyle="bold" />
-                    <Space android:layout_width="8dp" android:layout_height="1dp" />
+                        android:textColor="@color/ink"
+                        android:textSize="12sp" />
+
+                    <Space android:layout_width="6dp" android:layout_height="1dp" />
+
                     <Button
                         android:id="@+id/navigationButton"
                         android:layout_width="0dp"
-                        android:layout_height="50dp"
+                        android:layout_height="40dp"
                         android:layout_weight="1"
                         android:background="@drawable/button_secondary"
-                        android:text="Abrir no mapa"
+                        android:text="🗺 Mapa"
                         android:textAllCaps="false"
-                        android:textColor="@color/orange_dark"
-                        android:textStyle="bold" />
+                        android:textColor="@color/ink"
+                        android:textSize="12sp" />
                 </LinearLayout>
 
-                <Button
-                    android:id="@+id/useInKeyboardButton"
+                <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/button_secondary"
-                    android:text="Começar o teclado nesta entrega"
-                    android:textAllCaps="false"
-                    android:textColor="@color/orange_dark"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/linkHouseButton"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/button_secondary"
+                        android:text="Vincular Casa"
+                        android:textAllCaps="false"
+                        android:textColor="@color/ink"
+                        android:textSize="11sp" />
+
+                    <Space android:layout_width="6dp" android:layout_height="1dp" />
+
+                    <Button
+                        android:id="@+id/generatePdfButton"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/button_secondary"
+                        android:text="Gerar PDF"
+                        android:textAllCaps="false"
+                        android:textColor="@color/ink"
+                        android:textSize="11sp" />
+
+                    <Space android:layout_width="6dp" android:layout_height="1dp" />
+
+                    <Button
+                        android:id="@+id/completeCurrentBtn"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/button_primary"
+                        android:text="✓ Concluir"
+                        android:textAllCaps="false"
+                        android:textColor="@color/white"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Barra discreta de Filtro de Bairro e Ordenação -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="4dp">
+
+                <TextView
+                    android:id="@+id/routeCountLabel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Fila de Entregas"
+                    android:textColor="@color/ink"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
 
                 <Button
-                    android:id="@+id/exportButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/button_secondary"
-                    android:text="Exportar códigos + nomes + endereços"
+                    android:id="@+id/sortOrderBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="34dp"
+                    android:background="@drawable/chip_neutral"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:text="Ordem: Manual"
                     android:textAllCaps="false"
-                    android:textColor="@color/orange_dark"
+                    android:textColor="@color/white"
+                    android:textSize="11sp" />
+
+                <Space android:layout_width="6dp" android:layout_height="1dp" />
+
+                <Button
+                    android:id="@+id/neighborhoodFilterBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="34dp"
+                    android:background="@drawable/chip_neutral"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:text="Bairro: Todos"
+                    android:textAllCaps="false"
+                    android:textColor="@color/white"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- Lista da Fila Virtualizada com RecyclerView -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/routeRecyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="16dp" />
+        </LinearLayout>
+
+        <!-- ==================== ABA 2: FOTOS ==================== -->
+        <LinearLayout
+            android:id="@+id/tabPhotosLayout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="12dp"
+            android:visibility="gone">
+
+            <!-- Duas ações claras de fotos -->
+            <Button
+                android:id="@+id/takePhotosActionBtn"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:background="@drawable/button_primary"
+                android:text="📷  TIRAR FOTOS DOS PACOTES"
+                android:textAllCaps="false"
+                android:textColor="@color/white"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/pickGalleryActionBtn"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/button_secondary"
+                android:text="📁  SELECIONAR DA GALERIA — ATÉ 50"
+                android:textAllCaps="false"
+                android:textColor="@color/orange_dark"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <!-- Progresso do processamento de fotos -->
+            <TextView
+                android:id="@+id/photoProgressText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:textColor="@color/muted"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <!-- Cabeçalho da Grade de Fotos Sem Destinatário -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/pendingPhotosTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="0 fotos sem destinatário"
+                    android:textColor="@color/ink"
+                    android:textSize="15sp"
                     android:textStyle="bold" />
 
                 <Button
-                    android:id="@+id/generatePdfButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:layout_marginTop="8dp"
+                    android:id="@+id/photoFilterBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:background="@drawable/chip_neutral"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:text="Filtro: Todos"
+                    android:textAllCaps="false"
+                    android:textColor="@color/white"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- Grade de 3 colunas de fotos pendentes -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/pendingPhotosGrid"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginTop="8dp"
+                android:layout_weight="1"
+                android:clipToPadding="false" />
+        </LinearLayout>
+
+        <!-- ==================== ABA 3: ARQUIVO ==================== -->
+        <LinearLayout
+            android:id="@+id/tabArchiveLayout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="12dp"
+            android:visibility="gone">
+
+            <!-- Sub-abas: Casas Salvas | Concluídas -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/archiveSubtabHouses"
+                    android:layout_width="0dp"
+                    android:layout_height="42dp"
+                    android:layout_weight="1"
                     android:background="@drawable/button_primary"
-                    android:text="Gerar PDF desta entrega"
+                    android:text="🏠 Casas Salvas"
                     android:textAllCaps="false"
                     android:textColor="@color/white"
                     android:textStyle="bold" />
+
+                <Space android:layout_width="8dp" android:layout_height="1dp" />
+
+                <Button
+                    android:id="@+id/archiveSubtabCompleted"
+                    android:layout_width="0dp"
+                    android:layout_height="42dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/button_secondary"
+                    android:text="✓ Concluídas"
+                    android:textAllCaps="false"
+                    android:textColor="@color/orange_dark"
+                    android:textStyle="bold" />
             </LinearLayout>
 
+            <!-- Container Casas Salvas -->
             <LinearLayout
-                android:id="@+id/deliverySection"
+                android:id="@+id/archiveHousesSection"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
+                android:layout_height="0dp"
+                android:layout_marginTop="8dp"
+                android:layout_weight="1"
                 android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/deliverySectionTitle"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Entregas da rota"
-                    android:textColor="@color/ink"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                <TextView
+                    <EditText
+                        android:id="@+id/archiveHouseSearchInput"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/field_soft"
+                        android:hint="🔍 Buscar casa por nome ou endereço..."
+                        android:maxLines="1"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:textColor="@color/ink"
+                        android:textSize="13sp" />
+
+                    <Space android:layout_width="6dp" android:layout_height="1dp" />
+
+                    <Button
+                        android:id="@+id/exportHousesBtn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:background="@drawable/button_secondary"
+                        android:text="📊 Exportar"
+                        android:textAllCaps="false"
+                        android:textColor="@color/orange_dark"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/archiveHousesRecyclerView"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:text="Toque numa entrega para selecioná-la"
-                    android:textColor="@color/muted"
+                    android:layout_height="0dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_weight="1"
+                    android:clipToPadding="false" />
+            </LinearLayout>
+
+            <!-- Container Concluídas -->
+            <LinearLayout
+                android:id="@+id/archiveCompletedSection"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginTop="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <EditText
+                    android:id="@+id/archiveCompletedSearchInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
+                    android:background="@drawable/field_soft"
+                    android:hint="🔍 Buscar código BR, nome ou endereço..."
+                    android:maxLines="1"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:textColor="@color/ink"
                     android:textSize="13sp" />
 
-                <LinearLayout
-                    android:id="@+id/deliveryContainer"
+                <TextView
+                    android:id="@+id/archiveCompletedCount"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:orientation="vertical" />
+                    android:layout_marginTop="4dp"
+                    android:text="0 concluídas"
+                    android:textColor="@color/muted"
+                    android:textSize="12sp" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/archiveCompletedRecyclerView"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_marginTop="6dp"
+                    android:layout_weight="1"
+                    android:clipToPadding="false" />
             </LinearLayout>
         </LinearLayout>
-    </ScrollView>
+
+        <!-- ==================== ABA 4: AJUSTES ==================== -->
+        <ScrollView
+            android:id="@+id/tabSettingsLayout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="12dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="24dp">
+
+                <!-- Bloco Automação -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/panel"
+                    android:orientation="vertical"
+                    android:padding="14dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Automação Assistida"
+                        android:textColor="@color/ink"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="Configurações de sobreposição, acessibilidade e painel flutuante"
+                        android:textColor="@color/muted"
+                        android:textSize="12sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/settingsOverlayChip"
+                            android:layout_width="0dp"
+                            android:layout_height="36dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/chip_neutral"
+                            android:gravity="center"
+                            android:text="Sobreposição"
+                            android:textColor="@color/white"
+                            android:textSize="12sp" />
+
+                        <Space android:layout_width="8dp" android:layout_height="1dp" />
+
+                        <TextView
+                            android:id="@+id/settingsAccessibilityChip"
+                            android:layout_width="0dp"
+                            android:layout_height="36dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/chip_neutral"
+                            android:gravity="center"
+                            android:text="Acessibilidade"
+                            android:textColor="@color/white"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/settingsOpenPanelBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="8dp"
+                        android:background="@drawable/button_secondary"
+                        android:text="▶ Abrir Painel Flutuante"
+                        android:textAllCaps="false"
+                        android:textColor="@color/orange_dark"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/settingsAutomationConfigBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:layout_marginTop="6dp"
+                        android:background="@drawable/button_secondary"
+                        android:text="Perfis e Gestos de Automação"
+                        android:textAllCaps="false"
+                        android:textColor="@color/ink"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <!-- Bloco Nome na Baixa -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/panel"
+                    android:orientation="vertical"
+                    android:padding="14dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Nome Usado na Baixa"
+                        android:textColor="@color/ink"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <RadioGroup
+                        android:id="@+id/settingsNameModeGroup"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp">
+
+                        <RadioButton
+                            android:id="@+id/radioUseSequence"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="true"
+                            android:text="Usar Sequence da planilha (com fallback)"
+                            android:textColor="@color/ink"
+                            android:textSize="13sp" />
+
+                        <RadioButton
+                            android:id="@+id/radioUseAlternative"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Usar Nome Alternativo fixo"
+                            android:textColor="@color/ink"
+                            android:textSize="13sp" />
+                    </RadioGroup>
+
+                    <EditText
+                        android:id="@+id/settingsAlternativeNameInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginTop="6dp"
+                        android:background="@drawable/field_soft"
+                        android:hint="Nome alternativo / fallback autorizado"
+                        android:inputType="textPersonName"
+                        android:maxLines="1"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:textColor="@color/ink"
+                        android:textSize="13sp" />
+
+                    <Button
+                        android:id="@+id/settingsSaveNameBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="42dp"
+                        android:layout_marginTop="6dp"
+                        android:background="@drawable/button_primary"
+                        android:text="Salvar Nome"
+                        android:textAllCaps="false"
+                        android:textColor="@color/white"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- Bloco Teclado: Altura -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/panel"
+                    android:orientation="vertical"
+                    android:padding="14dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Altura do Teclado"
+                        android:textColor="@color/ink"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/settingsKeyboardHeightLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="Altura atual: 290 dp"
+                        android:textColor="@color/muted"
+                        android:textSize="12sp" />
+
+                    <SeekBar
+                        android:id="@+id/settingsKeyboardHeightSeekBar"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:max="200"
+                        android:progress="70" />
+                </LinearLayout>
+
+                <!-- Bloco Diagnóstico -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/panel"
+                    android:orientation="vertical"
+                    android:padding="14dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Diagnóstico do Sistema"
+                        android:textColor="@color/ink"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/diagnosticDetailsText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:lineSpacingExtra="3dp"
+                        android:text="Carregando diagnóstico..."
+                        android:textColor="@color/ink"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/diagnosticExportBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="42dp"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/button_secondary"
+                        android:text="📋 Copiar Diagnóstico Técnico"
+                        android:textAllCaps="false"
+                        android:textColor="@color/orange_dark"
+                        android:textSize="13sp" />
+
+                    <Button
+                        android:id="@+id/clearRouteOnlyBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:layout_marginTop="6dp"
+                        android:background="@drawable/button_secondary"
+                        android:text="Limpar somente rota ativa"
+                        android:textAllCaps="false"
+                        android:textColor="#C0392B"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
+    </FrameLayout>
+
+    <!-- Bottom Navigation Bar (4 Abas Profissionais) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="58dp"
+        android:background="@color/white"
+        android:elevation="8dp"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:id="@+id/navTabRoute"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/navIconRoute"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📦"
+                android:textSize="18sp" />
+
+            <TextView
+                android:id="@+id/navTextRoute"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Rota"
+                android:textColor="@color/orange"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/navTabPhotos"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/navIconPhotos"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📷"
+                android:textSize="18sp" />
+
+            <TextView
+                android:id="@+id/navTextPhotos"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Fotos"
+                android:textColor="@color/muted"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/navTabArchive"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/navIconArchive"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📁"
+                android:textSize="18sp" />
+
+            <TextView
+                android:id="@+id/navTextArchive"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Arquivo"
+                android:textColor="@color/muted"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/navTabSettings"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/navIconSettings"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⚙"
+                android:textSize="18sp" />
+
+            <TextView
+                android:id="@+id/navTextSettings"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Ajustes"
+                android:textColor="@color/muted"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </LinearLayout>
+
 </LinearLayout>

@@ -5,86 +5,109 @@ import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.BaseAdapter;
 import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class DeliveryAdapter extends BaseAdapter {
-    public interface MenuListener {
-        void onMenu(int position);
+public class DeliveryAdapter extends RecyclerView.Adapter<DeliveryAdapter.ViewHolder> {
+    public interface OnDeliveryClickListener {
+        void onClick(int position, Delivery delivery);
+        void onMenu(int position, Delivery delivery);
     }
 
-    private final LayoutInflater inflater;
+    private final Context context;
     private final HouseStore houseStore;
-    private final MenuListener menuListener;
+    private final OnDeliveryClickListener listener;
     private List<Delivery> deliveries = new ArrayList<>();
     private int selectedIndex = -1;
 
-    public DeliveryAdapter(Context context, MenuListener menuListener) {
-        inflater = LayoutInflater.from(context);
-        houseStore = new HouseStore(context);
-        this.menuListener = menuListener;
+    public DeliveryAdapter(Context context, OnDeliveryClickListener listener) {
+        this.context = context;
+        this.houseStore = new HouseStore(context);
+        this.listener = listener;
     }
 
     public void submit(List<Delivery> items, int selectedIndex) {
-        this.deliveries = items;
+        this.deliveries = items == null ? new ArrayList<>() : new ArrayList<>(items);
         this.selectedIndex = selectedIndex;
         notifyDataSetChanged();
     }
 
-    @Override public int getCount() { return deliveries.size(); }
-    @Override public Delivery getItem(int position) { return deliveries.get(position); }
-    @Override public long getItemId(int position) { return position; }
+    @NonNull
+    @Override
+    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(context).inflate(R.layout.item_delivery, parent, false);
+        return new ViewHolder(view);
+    }
 
     @Override
-    public View getView(int position, View convertView, ViewGroup parent) {
-        View view = convertView;
-        Holder holder;
-        if (view == null) {
-            view = inflater.inflate(R.layout.item_delivery, parent, false);
-            holder = new Holder();
-            holder.position = view.findViewById(R.id.itemPosition);
-            holder.code = view.findViewById(R.id.itemCode);
-            holder.name = view.findViewById(R.id.itemName);
-            holder.address = view.findViewById(R.id.itemAddress);
-            holder.photoStatus = view.findViewById(R.id.itemPhotoStatus);
-            holder.menu = view.findViewById(R.id.itemMenu);
-            view.setTag(holder);
-        } else {
-            holder = (Holder) view.getTag();
-        }
-
-        Delivery item = getItem(position);
+    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+        Delivery item = deliveries.get(position);
         holder.position.setText(String.valueOf(position + 1));
         holder.code.setText(item.trackingCode);
-        House house = houseStore.findById(item.houseId);
-        String name = house != null && !house.residents.isEmpty() ? house.residents : item.customerName;
+
+        House house = item.houseId != null && !item.houseId.isEmpty() ? houseStore.findById(item.houseId) : null;
+        String name = item.customerName;
+        if (name.isEmpty() || "-".equals(name.trim())) {
+            name = house != null && !house.residents.isEmpty() ? house.residents : "";
+        }
         String address = house != null && !house.address.isEmpty() ? house.address : item.address;
         String facade = house == null ? item.facadePhotoUri : house.facadePhotoUri;
+
         holder.name.setText(name);
         holder.name.setVisibility(name.isEmpty() ? View.GONE : View.VISIBLE);
         holder.address.setText(address);
         holder.address.setVisibility(address.isEmpty() ? View.GONE : View.VISIBLE);
+
         holder.photoStatus.setText(
                 (item.hasOccurrence() ? "⚠ " : "") +
                 (item.packagePhotoUri.isEmpty() ? "📦○" : "📦✓") + " " +
                 (facade.isEmpty() ? "🏠○" : "🏠✓")
         );
-        holder.menu.setOnClickListener(v -> {
-            if (menuListener != null) menuListener.onMenu(position);
+
+        holder.itemView.setBackgroundResource(position == selectedIndex
+                ? R.drawable.delivery_card_selected : R.drawable.delivery_card);
+
+        holder.itemView.setOnClickListener(v -> {
+            int pos = holder.getAdapterPosition();
+            if (pos != RecyclerView.NO_POSITION && listener != null) {
+                listener.onClick(pos, deliveries.get(pos));
+            }
         });
-        view.setBackgroundColor(position == selectedIndex ? Color.rgb(255, 240, 232) : Color.WHITE);
-        return view;
+
+        holder.menu.setOnClickListener(v -> {
+            int pos = holder.getAdapterPosition();
+            if (pos != RecyclerView.NO_POSITION && listener != null) {
+                listener.onMenu(pos, deliveries.get(pos));
+            }
+        });
     }
 
-    private static final class Holder {
+    @Override
+    public int getItemCount() {
+        return deliveries.size();
+    }
+
+    static class ViewHolder extends RecyclerView.ViewHolder {
         TextView position;
         TextView code;
         TextView name;
         TextView address;
         TextView photoStatus;
         TextView menu;
+
+        ViewHolder(@NonNull View itemView) {
+            super(itemView);
+            position = itemView.findViewById(R.id.itemPosition);
+            code = itemView.findViewById(R.id.itemCode);
+            name = itemView.findViewById(R.id.itemName);
+            address = itemView.findViewById(R.id.itemAddress);
+            photoStatus = itemView.findViewById(R.id.itemPhotoStatus);
+            menu = itemView.findViewById(R.id.itemMenu);
+        }
     }
 }

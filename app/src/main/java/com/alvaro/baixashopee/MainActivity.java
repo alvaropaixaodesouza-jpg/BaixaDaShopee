@@ -2,232 +2,783 @@ package com.alvaro.baixashopee;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.ComponentName;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.graphics.Color;
-import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.WindowInsetsController;
-import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.alvaro.baixashopee.data.db.AppDatabase;
+import com.alvaro.baixashopee.data.db.entities.CompletedDeliveryEntity;
+import com.alvaro.baixashopee.data.db.entities.PhotoEntity;
+import com.alvaro.baixashopee.data.model.DeliveryGroup;
+import com.alvaro.baixashopee.data.model.NeighborhoodHelper;
+import com.alvaro.baixashopee.data.model.QueueOrganizer;
+import com.alvaro.baixashopee.data.model.SortOrder;
+import com.alvaro.baixashopee.data.repository.DeliveryRepository;
+import com.alvaro.baixashopee.export.HouseExporter;
+import com.alvaro.baixashopee.photo.PendingPhotosAdapter;
+import com.alvaro.baixashopee.photo.PhotoAssignerDialog;
+import com.alvaro.baixashopee.photo.PhotoProcessor;
+import com.alvaro.baixashopee.photo.TempMediaStoreManager;
+
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
     private static final int REQUEST_IMPORT = 101;
-    private static final int REQUEST_CAMERA = 102;
-    private static final int REQUEST_EXPORT = 103;
-    private static final int REQUEST_QR = 104;
+    private static final int REQUEST_CAMERA_PACKAGE = 102;
+    private static final int REQUEST_CAMERA_FACADE = 103;
+    private static final int REQUEST_PICK_GALLERY = 104;
+    private static final int REQUEST_EXPORT_HOUSES = 105;
 
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private DeliveryStore store;
     private HouseStore houseStore;
-    private OccurrenceManager occurrenceManager;
-    private ProfileManager profileManager;
+    private DeliveryRepository repository;
+    private AppDatabase db;
+    private PhotoProcessor photoProcessor;
+
+    // Abas de navegação
+    private View tabRouteLayout;
+    private View tabPhotosLayout;
+    private View tabArchiveLayout;
+    private View tabSettingsLayout;
+    private TextView navTextRoute, navTextPhotos, navTextArchive, navTextSettings;
     private TextView summaryText;
+
+    // Aba Rota
     private TextView currentDeliveryText;
-    private TextView overlayPermissionChip;
-    private TextView accessibilityPermissionChip;
-    private TextView deliverySectionTitle;
-    private EditText receiverNameInput;
-    private LinearLayout deliveryContainer;
-    private Button packagePhotoButton;
-    private Button facadePhotoButton;
-    private Button linkHouseButton;
-    private Button navigationButton;
-    private Button generatePdfButton;
-    private ImageView packagePreview;
-    private ImageView facadePreview;
-    private boolean pendingPackagePhoto;
-    private boolean pendingAutomationSetup;
-    private boolean accessibilityPromptVisible;
-    private int selectedIndex;
-    private int pendingPhotoIndex = -1;
+    private Button completeCurrentBtn;
+    private Button packagePhotoButton, facadePhotoButton, navigationButton, linkHouseButton, generatePdfButton;
+    private Button sortOrderBtn, neighborhoodFilterBtn;
+    private TextView routeCountLabel;
+    private RecyclerView routeRecyclerView;
+    private DeliveryAdapter deliveryAdapter;
+    private int selectedIndex = 0;
+
+    // Aba Fotos
+    private TextView photoProgressText;
+    private TextView pendingPhotosTitle;
+    private Button photoFilterBtn;
+    private RecyclerView pendingPhotosGrid;
+    private PendingPhotosAdapter pendingPhotosAdapter;
+    private String currentPhotoFilter = "ALL";
+
+    // Aba Arquivo
+    private Button archiveSubtabHouses, archiveSubtabCompleted;
+    private View archiveHousesSection, archiveCompletedSection;
+    private EditText archiveHouseSearchInput, archiveCompletedSearchInput;
+    private TextView archiveCompletedCount;
+    private RecyclerView archiveHousesRecyclerView, archiveCompletedRecyclerView;
+    private HouseAdapter houseAdapter;
+    private CompletedDeliveriesAdapter completedDeliveriesAdapter;
+
+    // Aba Ajustes
+    private TextView settingsOverlayChip, settingsAccessibilityChip;
+    private RadioGroup settingsNameModeGroup;
+    private RadioButton radioUseSequence, radioUseAlternative;
+    private EditText settingsAlternativeNameInput;
+    private TextView settingsKeyboardHeightLabel;
+    private SeekBar settingsKeyboardHeightSeekBar;
+    private TextView diagnosticDetailsText;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        try {
-            setContentView(R.layout.activity_main);
-            configureSystemBars();
+        setContentView(R.layout.activity_main);
+        configureSystemBars();
 
-            store = new DeliveryStore(this);
-            houseStore = new HouseStore(this);
-            occurrenceManager = new OccurrenceManager(this);
-            profileManager = new ProfileManager(this);
-            summaryText = findViewById(R.id.summaryText);
-            currentDeliveryText = findViewById(R.id.currentDeliveryText);
-            overlayPermissionChip = findViewById(R.id.overlayPermissionChip);
-            accessibilityPermissionChip = findViewById(R.id.accessibilityPermissionChip);
-            deliverySectionTitle = findViewById(R.id.deliverySectionTitle);
-            deliveryContainer = findViewById(R.id.deliveryContainer);
-            receiverNameInput = findViewById(R.id.receiverNameInput);
-            packagePhotoButton = findViewById(R.id.packagePhotoButton);
-            facadePhotoButton = findViewById(R.id.facadePhotoButton);
-            linkHouseButton = findViewById(R.id.linkHouseButton);
-            navigationButton = findViewById(R.id.navigationButton);
-            generatePdfButton = findViewById(R.id.generatePdfButton);
-            packagePreview = findViewById(R.id.packagePreview);
-            facadePreview = findViewById(R.id.facadePreview);
+        store = new DeliveryStore(this);
+        houseStore = new HouseStore(this);
+        repository = DeliveryRepository.getInstance(this);
+        db = AppDatabase.getInstance(this);
+        photoProcessor = new PhotoProcessor(this);
 
-            receiverNameInput.setText(store.getReceiverName());
-            List<Delivery> initial = store.getDeliveries();
-            selectedIndex = initial.isEmpty() ? 0 : Math.min(store.getCurrentIndex(), initial.size() - 1);
-            findViewById(R.id.saveNameButton).setOnClickListener(v -> saveReceiverName());
-            findViewById(R.id.importButton).setOnClickListener(v -> chooseSpreadsheet());
-            findViewById(R.id.moreButton).setOnClickListener(v -> showMoreTools());
-            findViewById(R.id.openPanelButton).setOnClickListener(v -> beginAutomationSetup());
-            overlayPermissionChip.setOnClickListener(v -> beginAutomationSetup());
-            accessibilityPermissionChip.setOnClickListener(v -> beginAutomationSetup());
-            findViewById(R.id.scanQrButton).setOnClickListener(v -> scanQrCode());
-            packagePhotoButton.setOnClickListener(v -> takePhoto(true));
-            facadePhotoButton.setOnClickListener(v -> takePhoto(false));
-            linkHouseButton.setOnClickListener(v -> showLinkHouseDialog());
-            navigationButton.setOnClickListener(v -> openNavigation());
-            generatePdfButton.setOnClickListener(v -> handleReport());
-            findViewById(R.id.useInKeyboardButton).setOnClickListener(v -> {
-                if (isValidSelection()) {
-                    store.setCurrentIndex(selectedIndex);
-                    refresh();
-                    Toast.makeText(this, "O teclado começará nesta entrega", Toast.LENGTH_SHORT).show();
-                }
-            });
-            findViewById(R.id.exportButton).setOnClickListener(v -> chooseExportDestination());
+        // Limpa temporários expirados na inicialização
+        TempMediaStoreManager.cleanExpired(this);
 
-            if (savedInstanceState != null) {
-                pendingPackagePhoto = savedInstanceState.getBoolean("pendingPackagePhoto", false);
-                selectedIndex = savedInstanceState.getInt("selectedIndex", selectedIndex);
-                pendingPhotoIndex = savedInstanceState.getInt("pendingPhotoIndex", -1);
-            }
+        initViews();
+        setupNavigation();
+        setupRouteTab();
+        setupPhotosTab();
+        setupArchiveTab();
+        setupSettingsTab();
 
-            if (!getPreferences(MODE_PRIVATE).getBoolean("notice_seen", false)) showSafetyNotice();
-            refresh();
-        } catch (Throwable error) {
-            showStartupRecovery(error);
-        }
-    }
-
-    private void showStartupRecovery(Throwable error) {
-        store = null;
-        houseStore = null;
-        LinearLayout recovery = new LinearLayout(this);
-        recovery.setOrientation(LinearLayout.VERTICAL);
-        int pad = (int) (22 * getResources().getDisplayMetrics().density);
-        recovery.setPadding(pad, pad, pad, pad);
-        recovery.setBackgroundColor(getColor(R.color.cream));
-
-        TextView title = new TextView(this);
-        title.setText("Baixa da Shopee — recuperação");
-        title.setTextSize(23);
-        title.setTextColor(getColor(R.color.ink));
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
-        recovery.addView(title);
-
-        TextView message = new TextView(this);
-        String detail = error.getClass().getSimpleName() +
-                (error.getMessage() == null ? "" : ": " + error.getMessage());
-        message.setText("O aplicativo encontrou um erro ao abrir, mas seus dados não foram apagados.\n\nErro: " + detail +
-                "\n\nTire uma captura desta tela e envie para corrigirmos exatamente a causa.");
-        message.setTextSize(16);
-        message.setTextColor(getColor(R.color.ink));
-        message.setPadding(0, pad, 0, pad);
-        recovery.addView(message);
-
-        Button retry = new Button(this);
-        retry.setText("Tentar abrir novamente");
-        retry.setAllCaps(false);
-        retry.setOnClickListener(v -> recreate());
-        recovery.addView(retry);
-
-        Button clearRoute = new Button(this);
-        clearRoute.setText("Limpar somente a rota e tentar");
-        clearRoute.setAllCaps(false);
-        clearRoute.setOnClickListener(v -> {
-            getSharedPreferences("delivery_queue", MODE_PRIVATE).edit()
-                    .remove("deliveries")
-                    .remove("current_index")
-                    .remove("tracking_used")
-                    .remove("numeric_used")
-                    .remove("name_used")
-                    .commit();
-            recreate();
-        });
-        recovery.addView(clearRoute);
-
-        ScrollView scroll = new ScrollView(this);
-        scroll.addView(recovery);
-        setContentView(scroll);
+        switchToTab("ROTA");
+        refreshAll();
     }
 
     private void configureSystemBars() {
         getWindow().setStatusBarColor(getColor(R.color.cream));
-        if (android.os.Build.VERSION.SDK_INT >= 30) {
+        if (Build.VERSION.SDK_INT >= 30) {
             WindowInsetsController controller = getWindow().getInsetsController();
-            if (controller != null) controller.setSystemBarsAppearance(
-                    WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,
-                    WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS);
+            if (controller != null) {
+                controller.setSystemBarsAppearance(
+                        WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,
+                        WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS);
+            }
+        }
+    }
+
+    private void initViews() {
+        summaryText = findViewById(R.id.summaryText);
+        tabRouteLayout = findViewById(R.id.tabRouteLayout);
+        tabPhotosLayout = findViewById(R.id.tabPhotosLayout);
+        tabArchiveLayout = findViewById(R.id.tabArchiveLayout);
+        tabSettingsLayout = findViewById(R.id.tabSettingsLayout);
+
+        navTextRoute = findViewById(R.id.navTextRoute);
+        navTextPhotos = findViewById(R.id.navTextPhotos);
+        navTextArchive = findViewById(R.id.navTextArchive);
+        navTextSettings = findViewById(R.id.navTextSettings);
+
+        findViewById(R.id.headerImportBtn).setOnClickListener(v -> chooseSpreadsheet());
+    }
+
+    private void setupNavigation() {
+        findViewById(R.id.navTabRoute).setOnClickListener(v -> switchToTab("ROTA"));
+        findViewById(R.id.navTabPhotos).setOnClickListener(v -> switchToTab("FOTOS"));
+        findViewById(R.id.navTabArchive).setOnClickListener(v -> switchToTab("ARQUIVO"));
+        findViewById(R.id.navTabSettings).setOnClickListener(v -> switchToTab("AJUSTES"));
+    }
+
+    private void switchToTab(String tab) {
+        tabRouteLayout.setVisibility("ROTA".equals(tab) ? View.VISIBLE : View.GONE);
+        tabPhotosLayout.setVisibility("FOTOS".equals(tab) ? View.VISIBLE : View.GONE);
+        tabArchiveLayout.setVisibility("ARQUIVO".equals(tab) ? View.VISIBLE : View.GONE);
+        tabSettingsLayout.setVisibility("AJUSTES".equals(tab) ? View.VISIBLE : View.GONE);
+
+        int activeColor = getColor(R.color.orange);
+        int inactiveColor = getColor(R.color.muted);
+
+        navTextRoute.setTextColor("ROTA".equals(tab) ? activeColor : inactiveColor);
+        navTextPhotos.setTextColor("FOTOS".equals(tab) ? activeColor : inactiveColor);
+        navTextArchive.setTextColor("ARQUIVO".equals(tab) ? activeColor : inactiveColor);
+        navTextSettings.setTextColor("AJUSTES".equals(tab) ? activeColor : inactiveColor);
+
+        if ("FOTOS".equals(tab)) loadPendingPhotos();
+        else if ("ARQUIVO".equals(tab)) loadArchiveData();
+        else if ("AJUSTES".equals(tab)) loadSettingsData();
+    }
+
+    // ==========================================
+    // ABA 1: ROTA
+    // ==========================================
+    private void setupRouteTab() {
+        currentDeliveryText = findViewById(R.id.currentDeliveryText);
+        completeCurrentBtn = findViewById(R.id.completeCurrentBtn);
+        packagePhotoButton = findViewById(R.id.packagePhotoButton);
+        facadePhotoButton = findViewById(R.id.facadePhotoButton);
+        navigationButton = findViewById(R.id.navigationButton);
+        linkHouseButton = findViewById(R.id.linkHouseButton);
+        generatePdfButton = findViewById(R.id.generatePdfButton);
+        sortOrderBtn = findViewById(R.id.sortOrderBtn);
+        neighborhoodFilterBtn = findViewById(R.id.neighborhoodFilterBtn);
+        routeCountLabel = findViewById(R.id.routeCountLabel);
+        routeRecyclerView = findViewById(R.id.routeRecyclerView);
+
+        routeRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+        deliveryAdapter = new DeliveryAdapter(this, new DeliveryAdapter.OnDeliveryClickListener() {
+            @Override
+            public void onClick(int position, Delivery delivery) {
+                selectedIndex = position;
+                store.setCurrentIndex(position);
+                refreshRoute();
+            }
+
+            @Override
+            public void onMenu(int position, Delivery delivery) {
+                showDeliveryMenu(position, delivery);
+            }
+        });
+        routeRecyclerView.setAdapter(deliveryAdapter);
+
+        findViewById(R.id.useInKeyboardButton).setOnClickListener(v -> {
+            store.setCurrentIndex(selectedIndex);
+            Toast.makeText(this, "Teclado começará nesta entrega", Toast.LENGTH_SHORT).show();
+            refreshRoute();
+        });
+
+        completeCurrentBtn.setOnClickListener(v -> {
+            Delivery current = getSelectedDelivery();
+            if (current != null) {
+                repository.completeDelivery(current.trackingCode);
+                Toast.makeText(this, "Entrega " + current.trackingCode + " concluída!", Toast.LENGTH_SHORT).show();
+                refreshAll();
+            }
+        });
+
+        packagePhotoButton.setOnClickListener(v -> takePhoto(true));
+        facadePhotoButton.setOnClickListener(v -> takePhoto(false));
+        navigationButton.setOnClickListener(v -> openNavigation());
+        linkHouseButton.setOnClickListener(v -> showLinkHouseDialog());
+        generatePdfButton.setOnClickListener(v -> generateDeliveryPdf());
+
+        sortOrderBtn.setOnClickListener(v -> showSortOrderDialog());
+        neighborhoodFilterBtn.setOnClickListener(v -> showNeighborhoodFilterDialog());
+    }
+
+    private void refreshRoute() {
+        List<Delivery> organized = repository.getOrganizedDeliveries();
+        if (selectedIndex >= organized.size()) selectedIndex = Math.max(0, organized.size() - 1);
+        deliveryAdapter.submit(organized, selectedIndex);
+
+        int pendingCount = organized.size();
+        int completedCount = 0;
+        try { completedCount = db.completedDeliveryDao().count(); } catch (Exception ignored) {}
+
+        summaryText.setText(pendingCount + " pendente(s) • " + completedCount + " concluída(s)");
+        routeCountLabel.setText("Fila (" + pendingCount + " entregas)");
+
+        sortOrderBtn.setText("Ordem: " + repository.getSortOrder().name());
+        String currentFilter = repository.getNeighborhoodFilter();
+        neighborhoodFilterBtn.setText("Bairro: " + (currentFilter.isEmpty() ? "Todos" : currentFilter));
+
+        Delivery current = getSelectedDelivery();
+        if (current == null) {
+            currentDeliveryText.setText("Nenhuma entrega ativa na fila");
+            setDeliveryActionsEnabled(false);
         } else {
-            getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+            setDeliveryActionsEnabled(true);
+            House house = current.houseId != null && !current.houseId.isEmpty() ? houseStore.findById(current.houseId) : null;
+            String houseInfo = house != null ? " [Casa: " + house.displayName() + "]" : "";
+            currentDeliveryText.setText(current.trackingCode + " • " + current.customerName + houseInfo + "\n" + current.address);
+            linkHouseButton.setText(house != null ? "Casa: " + house.displayName() : "Vincular Casa");
         }
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (store != null) {
-            refresh();
-            continueAutomationSetupIfNeeded();
-        }
+    private Delivery getSelectedDelivery() {
+        List<Delivery> list = repository.getOrganizedDeliveries();
+        if (list.isEmpty()) return null;
+        if (selectedIndex < 0 || selectedIndex >= list.size()) selectedIndex = 0;
+        return list.get(selectedIndex);
     }
 
-    @Override
-    protected void onSaveInstanceState(Bundle outState) {
-        super.onSaveInstanceState(outState);
-        outState.putBoolean("pendingPackagePhoto", pendingPackagePhoto);
-        outState.putInt("selectedIndex", selectedIndex);
-        outState.putInt("pendingPhotoIndex", pendingPhotoIndex);
+    private void setDeliveryActionsEnabled(boolean enabled) {
+        packagePhotoButton.setEnabled(enabled);
+        facadePhotoButton.setEnabled(enabled);
+        navigationButton.setEnabled(enabled);
+        linkHouseButton.setEnabled(enabled);
+        generatePdfButton.setEnabled(enabled);
+        completeCurrentBtn.setEnabled(enabled);
+        findViewById(R.id.useInKeyboardButton).setEnabled(enabled);
     }
 
-    private void showSafetyNotice() {
+    private void showSortOrderDialog() {
+        String[] options = {"Manual (Ordem de importação/arraste)", "Nome A-Z (Maiúsculas no final)", "Bairro (Cabuçu / Bom Jesus / etc.)"};
         new AlertDialog.Builder(this)
-                .setTitle("Uso responsável")
-                .setMessage("Este aplicativo organiza textos, rotas e fotos. Ele não confirma entregas. Use somente dados, imagens e procedimentos autorizados pela sua operação e confira cada encomenda antes de finalizar no aplicativo oficial.")
-                .setCancelable(false)
-                .setPositiveButton("Entendi", (dialog, which) ->
-                        getPreferences(MODE_PRIVATE).edit().putBoolean("notice_seen", true).apply())
+                .setTitle("Ordenar entregas")
+                .setItems(options, (d, which) -> {
+                    if (which == 0) repository.setSortOrder(SortOrder.MANUAL);
+                    else if (which == 1) repository.setSortOrder(SortOrder.NAME_AZ);
+                    else if (which == 2) repository.setSortOrder(SortOrder.NEIGHBORHOOD);
+                    refreshRoute();
+                })
                 .show();
     }
 
-    private void saveReceiverName() {
-        String name = receiverNameInput.getText().toString().trim();
-        if (name.isEmpty()) {
-            receiverNameInput.setError("Digite o nome autorizado do recebedor");
-            return;
+    private void showNeighborhoodFilterDialog() {
+        List<Delivery> all = store.getDeliveries();
+        Set<String> neighborhoods = new HashSet<>();
+        neighborhoods.add("TODOS OS BAIRROS");
+        for (Delivery d : all) {
+            String g = NeighborhoodHelper.getCanonicalGroup(d.neighborhood);
+            if (!g.isEmpty()) neighborhoods.add(g);
         }
-        store.setReceiverName(name);
-        Toast.makeText(this, "Nome salvo no teclado", Toast.LENGTH_SHORT).show();
+
+        List<String> items = new ArrayList<>(neighborhoods);
+        new AlertDialog.Builder(this)
+                .setTitle("Filtrar por Bairro")
+                .setItems(items.toArray(new String[0]), (d, which) -> {
+                    String chosen = items.get(which);
+                    repository.setNeighborhoodFilter(chosen.startsWith("TODOS") ? "TODOS" : chosen);
+                    refreshRoute();
+                })
+                .show();
     }
 
+    private void showDeliveryMenu(int position, Delivery delivery) {
+        String[] options = {"Marcar como Concluída", "Editar detalhes", "Registrar Ocorrência", "Remover da rota"};
+        new AlertDialog.Builder(this)
+                .setTitle(delivery.trackingCode)
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        repository.completeDelivery(delivery.trackingCode);
+                        refreshAll();
+                    } else if (which == 1) {
+                        showEditDeliveryDialog(position, delivery);
+                    } else if (which == 2) {
+                        showOccurrenceDialog(position, delivery);
+                    } else if (which == 3) {
+                        store.removeAt(position);
+                        refreshRoute();
+                    }
+                })
+                .show();
+    }
+
+    private void showEditDeliveryDialog(int position, Delivery delivery) {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(32, 16, 32, 16);
+
+        EditText nameInput = new EditText(this);
+        nameInput.setHint("Nome do destinatário");
+        nameInput.setText(delivery.customerName);
+        layout.addView(nameInput);
+
+        EditText addrInput = new EditText(this);
+        addrInput.setHint("Endereço");
+        addrInput.setText(delivery.address);
+        layout.addView(addrInput);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Editar entrega " + delivery.trackingCode)
+                .setView(layout)
+                .setNegativeButton("Cancelar", null)
+                .setPositiveButton("Salvar", (d, w) -> {
+                    store.updateDetailsAt(position, nameInput.getText().toString(), addrInput.getText().toString());
+                    refreshRoute();
+                })
+                .show();
+    }
+
+    private void showOccurrenceDialog(int position, Delivery delivery) {
+        String[] types = {"Destinatário Ausente", "Endereço Não Localizado", "Recusado", "Outro"};
+        new AlertDialog.Builder(this)
+                .setTitle("Registrar Ocorrência")
+                .setItems(types, (d, which) -> {
+                    store.markOccurrenceAt(position, types[which], "Marcado pelo operador");
+                    refreshRoute();
+                })
+                .show();
+    }
+
+    private void showLinkHouseDialog() {
+        Delivery current = getSelectedDelivery();
+        if (current == null) return;
+        List<House> houses = houseStore.getHouses();
+        List<String> options = new ArrayList<>();
+        options.add("➕ Cadastrar nova casa permanente");
+        for (House h : houses) {
+            options.add(h.displayName() + " — " + h.address);
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Vincular casa a " + current.trackingCode)
+                .setItems(options.toArray(new String[0]), (dialog, which) -> {
+                    if (which == 0) {
+                        showHouseEditor(null, selectedIndex);
+                    } else {
+                        House chosen = houses.get(which - 1);
+                        store.linkHouseAt(selectedIndex, chosen.id);
+                        refreshRoute();
+                    }
+                })
+                .show();
+    }
+
+    private void openNavigation() {
+        Delivery current = getSelectedDelivery();
+        if (current == null) return;
+        House house = current.houseId != null ? houseStore.findById(current.houseId) : null;
+        String query = house != null && !house.address.isEmpty() ? house.address : current.address;
+        if (query.isEmpty()) return;
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + Uri.encode(query)));
+        try { startActivity(intent); } catch (Exception e) {
+            Toast.makeText(this, "Nenhum aplicativo de mapa instalado", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void generateDeliveryPdf() {
+        Delivery current = getSelectedDelivery();
+        if (current == null) return;
+        House house = current.houseId != null ? houseStore.findById(current.houseId) : null;
+        try {
+            Uri pdf = DeliveryReportGenerator.generate(this, current, house);
+            store.updateReportAt(selectedIndex, pdf.toString());
+            refreshRoute();
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(pdf, "application/pdf");
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(intent);
+        } catch (Exception e) {
+            Toast.makeText(this, "Não foi possível gerar relatório", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    // ==========================================
+    // ABA 2: FOTOS
+    // ==========================================
+    private void setupPhotosTab() {
+        photoProgressText = findViewById(R.id.photoProgressText);
+        pendingPhotosTitle = findViewById(R.id.pendingPhotosTitle);
+        photoFilterBtn = findViewById(R.id.photoFilterBtn);
+        pendingPhotosGrid = findViewById(R.id.pendingPhotosGrid);
+
+        pendingPhotosGrid.setLayoutManager(new GridLayoutManager(this, 3));
+        pendingPhotosAdapter = new PendingPhotosAdapter(this, (position, photo) -> {
+            executor.execute(() -> {
+                List<PhotoEntity> currentPhotos = db.photoDao().getUnassignedPhotos();
+                runOnUiThread(() -> {
+                    PhotoAssignerDialog assigner = new PhotoAssignerDialog(this, currentPhotos, position, this::loadPendingPhotos);
+                    assigner.show();
+                });
+            });
+        });
+        pendingPhotosGrid.setAdapter(pendingPhotosAdapter);
+
+        findViewById(R.id.takePhotosActionBtn).setOnClickListener(v -> takePhoto(true));
+        findViewById(R.id.pickGalleryActionBtn).setOnClickListener(v -> pickPhotosFromGallery());
+        photoFilterBtn.setOnClickListener(v -> showPhotoFilterDialog());
+    }
+
+    private void pickPhotosFromGallery() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("image/*");
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        startActivityForResult(intent, REQUEST_PICK_GALLERY);
+    }
+
+    private void showPhotoFilterDialog() {
+        String[] options = {"Todos", "Sem leitura", "Código não encontrado", "Ambíguos"};
+        new AlertDialog.Builder(this)
+                .setTitle("Filtrar fotos pendentes")
+                .setItems(options, (d, which) -> {
+                    if (which == 0) currentPhotoFilter = "ALL";
+                    else if (which == 1) currentPhotoFilter = PhotoEntity.STATUS_PENDING_NO_READING;
+                    else if (which == 2) currentPhotoFilter = PhotoEntity.STATUS_PENDING_NOT_FOUND;
+                    else if (which == 3) currentPhotoFilter = PhotoEntity.STATUS_PENDING_AMBIGUOUS;
+                    photoFilterBtn.setText("Filtro: " + options[which]);
+                    pendingPhotosAdapter.setFilter(currentPhotoFilter);
+                })
+                .show();
+    }
+
+    private void loadPendingPhotos() {
+        executor.execute(() -> {
+            List<PhotoEntity> photos = db.photoDao().getUnassignedPhotos();
+            runOnUiThread(() -> {
+                pendingPhotosTitle.setText(photos.size() + " foto(s) sem destinatário");
+                pendingPhotosAdapter.submitList(photos);
+            });
+        });
+    }
+
+    // ==========================================
+    // ABA 3: ARQUIVO
+    // ==========================================
+    private void setupArchiveTab() {
+        archiveSubtabHouses = findViewById(R.id.archiveSubtabHouses);
+        archiveSubtabCompleted = findViewById(R.id.archiveSubtabCompleted);
+        archiveHousesSection = findViewById(R.id.archiveHousesSection);
+        archiveCompletedSection = findViewById(R.id.archiveCompletedSection);
+
+        archiveHouseSearchInput = findViewById(R.id.archiveHouseSearchInput);
+        archiveCompletedSearchInput = findViewById(R.id.archiveCompletedSearchInput);
+        archiveCompletedCount = findViewById(R.id.archiveCompletedCount);
+
+        archiveHousesRecyclerView = findViewById(R.id.archiveHousesRecyclerView);
+        archiveHousesRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+        houseAdapter = new HouseAdapter(this, house -> showHouseEditor(house, -1));
+        archiveHousesRecyclerView.setAdapter(houseAdapter);
+
+        archiveCompletedRecyclerView = findViewById(R.id.archiveCompletedRecyclerView);
+        archiveCompletedRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+        completedDeliveriesAdapter = new CompletedDeliveriesAdapter(this, item -> {
+            repository.undoCompletion(item.trackingCode);
+            Toast.makeText(this, "Entrega " + item.trackingCode + " devolvida à fila", Toast.LENGTH_SHORT).show();
+            loadArchiveData();
+            refreshRoute();
+        });
+        archiveCompletedRecyclerView.setAdapter(completedDeliveriesAdapter);
+
+        archiveSubtabHouses.setOnClickListener(v -> switchArchiveSubtab(true));
+        archiveSubtabCompleted.setOnClickListener(v -> switchArchiveSubtab(false));
+        findViewById(R.id.exportHousesBtn).setOnClickListener(v -> chooseExportHousesFile());
+
+        archiveHouseSearchInput.addTextChangedListener(new SimpleTextWatcher() {
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                filterHouses(s.toString().trim());
+            }
+        });
+
+        archiveCompletedSearchInput.addTextChangedListener(new SimpleTextWatcher() {
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                filterCompleted(s.toString().trim());
+            }
+        });
+    }
+
+    private void switchArchiveSubtab(boolean showHouses) {
+        archiveHousesSection.setVisibility(showHouses ? View.VISIBLE : View.GONE);
+        archiveCompletedSection.setVisibility(showHouses ? View.GONE : View.VISIBLE);
+        archiveSubtabHouses.setBackgroundResource(showHouses ? R.drawable.button_primary : R.drawable.button_secondary);
+        archiveSubtabHouses.setTextColor(showHouses ? Color.WHITE : getColor(R.color.orange_dark));
+        archiveSubtabCompleted.setBackgroundResource(!showHouses ? R.drawable.button_primary : R.drawable.button_secondary);
+        archiveSubtabCompleted.setTextColor(!showHouses ? Color.WHITE : getColor(R.color.orange_dark));
+        loadArchiveData();
+    }
+
+    private void loadArchiveData() {
+        filterHouses(archiveHouseSearchInput.getText().toString().trim());
+        filterCompleted(archiveCompletedSearchInput.getText().toString().trim());
+    }
+
+    private void filterHouses(String query) {
+        List<House> all = houseStore.getHouses();
+        if (query.isEmpty()) {
+            houseAdapter.submitList(all);
+            return;
+        }
+        String q = query.toLowerCase(Locale.ROOT);
+        List<House> filtered = new ArrayList<>();
+        for (House h : all) {
+            if (h.displayName().toLowerCase(Locale.ROOT).contains(q)
+                    || h.address.toLowerCase(Locale.ROOT).contains(q)
+                    || h.residents.toLowerCase(Locale.ROOT).contains(q)) {
+                filtered.add(h);
+            }
+        }
+        houseAdapter.submitList(filtered);
+    }
+
+    private void filterCompleted(String query) {
+        executor.execute(() -> {
+            List<CompletedDeliveryEntity> list = query.isEmpty()
+                    ? db.completedDeliveryDao().getAll()
+                    : db.completedDeliveryDao().search(query);
+            runOnUiThread(() -> {
+                archiveCompletedCount.setText(list.size() + " entrega(s) concluída(s)");
+                completedDeliveriesAdapter.submitList(list);
+            });
+        });
+    }
+
+    private void chooseExportHousesFile() {
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("text/csv");
+        intent.putExtra(Intent.EXTRA_TITLE, HouseExporter.generateFileName());
+        startActivityForResult(intent, REQUEST_EXPORT_HOUSES);
+    }
+
+    private void exportHousesToUri(Uri uri) {
+        executor.execute(() -> {
+            try (OutputStream out = getContentResolver().openOutputStream(uri)) {
+                if (out != null) {
+                    HouseExporter.exportToCsv(houseStore.getHouses(), out);
+                    runOnUiThread(() -> Toast.makeText(this, "Casas salvas exportadas com sucesso!", Toast.LENGTH_LONG).show());
+                }
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(this, "Erro ao exportar: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+            }
+        });
+    }
+
+    private void showHouseEditor(House existing, int linkIndex) {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(32, 16, 32, 16);
+
+        EditText labelInput = new EditText(this);
+        labelInput.setHint("Apelido da casa / Ponto de referência");
+        labelInput.setText(existing != null ? existing.label : "");
+        layout.addView(labelInput);
+
+        EditText residentsInput = new EditText(this);
+        residentsInput.setHint("Moradores (separados por •)");
+        residentsInput.setText(existing != null ? existing.residents : "");
+        layout.addView(residentsInput);
+
+        EditText addressInput = new EditText(this);
+        addressInput.setHint("Endereço completo");
+        addressInput.setText(existing != null ? existing.address : "");
+        layout.addView(addressInput);
+
+        new AlertDialog.Builder(this)
+                .setTitle(existing == null ? "Nova Casa" : "Editar Casa")
+                .setView(layout)
+                .setNegativeButton("Cancelar", null)
+                .setPositiveButton("Salvar", (d, w) -> {
+                    String id = existing != null ? existing.id : "";
+                    House h = new House(id, labelInput.getText().toString(), residentsInput.getText().toString(),
+                            addressInput.getText().toString(), existing != null ? existing.mapUri : "",
+                            existing != null ? existing.facadePhotoUri : "", existing != null ? existing.notes : "");
+                    houseStore.save(h);
+                    if (linkIndex >= 0) store.linkHouseAt(linkIndex, h.id);
+                    loadArchiveData();
+                    refreshRoute();
+                })
+                .show();
+    }
+
+    // ==========================================
+    // ABA 4: AJUSTES
+    // ==========================================
+    private void setupSettingsTab() {
+        settingsOverlayChip = findViewById(R.id.settingsOverlayChip);
+        settingsAccessibilityChip = findViewById(R.id.settingsAccessibilityChip);
+        settingsNameModeGroup = findViewById(R.id.settingsNameModeGroup);
+        radioUseSequence = findViewById(R.id.radioUseSequence);
+        radioUseAlternative = findViewById(R.id.radioUseAlternative);
+        settingsAlternativeNameInput = findViewById(R.id.settingsAlternativeNameInput);
+        settingsKeyboardHeightLabel = findViewById(R.id.settingsKeyboardHeightLabel);
+        settingsKeyboardHeightSeekBar = findViewById(R.id.settingsKeyboardHeightSeekBar);
+        diagnosticDetailsText = findViewById(R.id.diagnosticDetailsText);
+
+        findViewById(R.id.settingsOpenPanelBtn).setOnClickListener(v -> openFloatingPanel());
+        findViewById(R.id.settingsAutomationConfigBtn).setOnClickListener(v -> startActivity(new Intent(this, AutomationSettingsActivity.class)));
+
+        settingsOverlayChip.setOnClickListener(v -> {
+            if (!Settings.canDrawOverlays(this)) {
+                startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())));
+            } else {
+                Toast.makeText(this, "Permissão de sobreposição já concedida", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        settingsAccessibilityChip.setOnClickListener(v -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
+
+        SharedPreferences namePrefs = getSharedPreferences("name_settings", MODE_PRIVATE);
+        String nameMode = namePrefs.getString("name_mode", "sequence");
+        radioUseSequence.setChecked("sequence".equals(nameMode));
+        radioUseAlternative.setChecked("alternative".equals(nameMode));
+        settingsAlternativeNameInput.setText(store.getReceiverName());
+
+        findViewById(R.id.settingsSaveNameBtn).setOnClickListener(v -> {
+            String mode = radioUseSequence.isChecked() ? "sequence" : "alternative";
+            String altName = settingsAlternativeNameInput.getText().toString().trim();
+            namePrefs.edit().putString("name_mode", mode).apply();
+            store.setReceiverName(altName);
+            Toast.makeText(this, "Preferências de nome salvas", Toast.LENGTH_SHORT).show();
+        });
+
+        // Altura do teclado (220 a 420 dp)
+        SharedPreferences kbPrefs = getSharedPreferences("keyboard_prefs", MODE_PRIVATE);
+        int currentHeight = kbPrefs.getInt("height_dp", 290);
+        settingsKeyboardHeightSeekBar.setProgress(currentHeight - 220);
+        settingsKeyboardHeightLabel.setText("Altura atual: " + currentHeight + " dp");
+
+        settingsKeyboardHeightSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                int height = 220 + progress;
+                settingsKeyboardHeightLabel.setText("Altura atual: " + height + " dp");
+                kbPrefs.edit().putInt("height_dp", height).apply();
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+
+        findViewById(R.id.diagnosticExportBtn).setOnClickListener(v -> copyDiagnosticToClipboard());
+        findViewById(R.id.clearRouteOnlyBtn).setOnClickListener(v -> {
+            new AlertDialog.Builder(this)
+                    .setTitle("Limpar Rota")
+                    .setMessage("Deseja limpar apenas a rota ativa? As casas salvas e o histórico não serão apagados.")
+                    .setNegativeButton("Cancelar", null)
+                    .setPositiveButton("Limpar Rota", (d, which) -> {
+                        repository.clearRouteOnly();
+                        refreshAll();
+                        Toast.makeText(this, "Rota ativa limpa", Toast.LENGTH_SHORT).show();
+                    })
+                    .show();
+        });
+    }
+
+    private void loadSettingsData() {
+        boolean overlayOk = Settings.canDrawOverlays(this);
+        boolean accessOk = AutomationAccessibilityService.isConnected();
+
+        settingsOverlayChip.setText(overlayOk ? "✓ Sobreposição OK" : "⚠ Ativar Sobreposição");
+        settingsOverlayChip.setBackgroundResource(overlayOk ? R.drawable.button_used : R.drawable.chip_neutral);
+
+        settingsAccessibilityChip.setText(accessOk ? "✓ Acessibilidade OK" : "⚠ Ativar Acessibilidade");
+        settingsAccessibilityChip.setBackgroundResource(accessOk ? R.drawable.button_used : R.drawable.chip_neutral);
+
+        // Carrega estatísticas do diagnóstico
+        executor.execute(() -> {
+            int houses = houseStore.getHouses().size();
+            int packages = store.getDeliveries().size();
+            int recipients = QueueOrganizer.groupDeliveries(store.getDeliveries()).size();
+            int completed = 0;
+            int unassignedPhotos = 0;
+            try {
+                completed = db.completedDeliveryDao().count();
+                unassignedPhotos = db.photoDao().countUnassigned();
+            } catch (Exception ignored) {}
+
+            String diagnostic = "• Versão: 0.8.0 (build 9)\n" +
+                    "• Casas salvas permanentes: " + houses + "\n" +
+                    "• Pacotes ativos na rota: " + packages + "\n" +
+                    "• Destinatários ativos: " + recipients + "\n" +
+                    "• Entregas concluídas (Room): " + completed + "\n" +
+                    "• Fotos sem destinatário: " + unassignedPhotos + "\n" +
+                    "• Ordem da fila: " + repository.getSortOrder() + "\n" +
+                    "• Filtro de bairro ativo: " + repository.getNeighborhoodFilter() + "\n" +
+                    "• Banco de dados Room: Conectado e ativo\n" +
+                    "• Armazenamento: Seguro / SQLite Room + SharedPreferences";
+
+            runOnUiThread(() -> diagnosticDetailsText.setText(diagnostic));
+        });
+    }
+
+    private void copyDiagnosticToClipboard() {
+        ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (cm != null) {
+            cm.setPrimaryClip(ClipData.newPlainText("Diagnóstico Baixas de Pacote", diagnosticDetailsText.getText().toString()));
+            Toast.makeText(this, "Diagnóstico copiado para a área de transferência", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void openFloatingPanel() {
+        if (!Settings.canDrawOverlays(this)) {
+            Toast.makeText(this, "Ative a sobreposição primeiro", Toast.LENGTH_LONG).show();
+            startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())));
+            return;
+        }
+        startService(new Intent(this, FloatingAssistantService.class));
+        Toast.makeText(this, "Painel flutuante aberto", Toast.LENGTH_SHORT).show();
+    }
+
+    // ==========================================
+    // IMPORTAÇÃO E CÂMERA
+    // ==========================================
     private void chooseSpreadsheet() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -239,928 +790,121 @@ public class MainActivity extends Activity {
         startActivityForResult(intent, REQUEST_IMPORT);
     }
 
-    private void importSpreadsheet(Uri uri) {
-        String displayName = queryDisplayName(uri);
-        summaryText.setText("Lendo " + displayName + "…");
-        new Thread(() -> {
-            try (InputStream input = getContentResolver().openInputStream(uri)) {
-                if (input == null) throw new IllegalStateException("Não foi possível abrir o arquivo.");
-                List<Delivery> imported = SpreadsheetImporter.importFile(input, displayName);
-                runOnUiThread(() -> confirmReplacement(imported));
-            } catch (Exception error) {
-                runOnUiThread(() -> {
-                    refresh();
-                    showError(error.getMessage());
-                });
-            }
-        }).start();
-    }
-
-    private void confirmReplacement(List<Delivery> imported) {
-        int named = 0;
-        for (Delivery delivery : imported) {
-            if (!delivery.customerName.trim().isEmpty()
-                    && !"-".equals(delivery.customerName.trim())) named++;
-        }
-        String details = named > 0
-                ? named + " nome(s) reconhecido(s) na coluna Sequence."
-                : "Nenhum nome apareceu na coluna Sequence deste arquivo.";
-        new AlertDialog.Builder(this)
-                .setTitle(imported.size() + " entregas encontradas")
-                .setMessage(details + "\n\nA rota do dia será substituída. A memória de casas não será apagada; endereços específicos já conhecidos serão vinculados automaticamente.")
-                .setNegativeButton("Cancelar", (dialog, which) -> refresh())
-                .setPositiveButton("Importar", (dialog, which) -> {
-                    store.replaceDeliveries(imported);
-                    selectedIndex = 0;
-                    refresh();
-                    Toast.makeText(this, "Nova rota pronta", Toast.LENGTH_LONG).show();
-                })
-                .show();
-    }
-
-    private void showPasteDialog() {
-        EditText input = new EditText(this);
-        input.setHint("Um código por linha\nBR123456789\nBR987654321");
-        input.setGravity(Gravity.TOP);
-        input.setMinLines(8);
-        input.setPadding(36, 18, 36, 18);
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Colar lista de códigos")
-                .setMessage("Também aceita: código; nome; endereço")
-                .setView(input)
-                .setNegativeButton("Cancelar", null)
-                .setPositiveButton("Carregar", null)
-                .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            List<Delivery> imported = SpreadsheetImporter.importPastedCodes(input.getText().toString());
-            if (imported.isEmpty()) input.setError("Nenhum código válido encontrado");
-            else {
-                dialog.dismiss();
-                confirmReplacement(imported);
-            }
-        }));
-        dialog.show();
-    }
-
-    private void confirmClearRoute() {
-        if (store.getDeliveries().isEmpty()) {
-            Toast.makeText(this, "A rota já está vazia", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        new AlertDialog.Builder(this)
-                .setTitle("Limpar a rota do dia?")
-                .setMessage("Os códigos e vínculos desta rota sairão da tela. Casas cadastradas, fotos de fachada e as fotos que já estão na galeria não serão apagadas.")
-                .setNegativeButton("Cancelar", null)
-                .setPositiveButton("Limpar rota", (dialog, which) -> {
-                    store.clearDeliveries();
-                    selectedIndex = 0;
-                    refresh();
-                    Toast.makeText(this, "Rota limpa; memória de casas preservada", Toast.LENGTH_LONG).show();
-                })
-                .show();
-    }
-
-    private void showMoreTools() {
-        new AlertDialog.Builder(this)
-                .setTitle("Mais ferramentas")
-                .setItems(new String[]{
-                        "Colar códigos",
-                        "Ativar teclado de entregas",
-                        "Escolher teclado",
-                        "Memória de casas",
-                        "Limpar rota atual"
-                }, (dialog, which) -> {
-                    if (which == 0) showPasteDialog();
-                    else if (which == 1) {
-                        startActivity(new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS));
-                    } else if (which == 2) {
-                        InputMethodManager manager =
-                                (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-                        manager.showInputMethodPicker();
-                    } else if (which == 3) showHouseMemory();
-                    else confirmClearRoute();
-                })
-                .setNegativeButton("Fechar", null)
-                .show();
-    }
-
-    private void beginAutomationSetup() {
-        pendingAutomationSetup = true;
-        accessibilityPromptVisible = false;
-        if (!Settings.canDrawOverlays(this)) {
-            new AlertDialog.Builder(this)
-                    .setTitle("Primeiro: mostrar o painel")
-                    .setMessage("Na próxima tela, ative “Permitir exibição sobre outros aplicativos” para Baixa da Shopee. Depois o aplicativo continuará para a acessibilidade.")
-                    .setNegativeButton("Agora não", (dialog, which) ->
-                            pendingAutomationSetup = false)
-                    .setPositiveButton("Abrir autorização", (dialog, which) -> {
-                        Intent permission = new Intent(
-                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                Uri.parse("package:" + getPackageName()));
-                        startActivity(permission);
-                    }).show();
-            return;
-        }
-        if (!isAutomationAccessibilityEnabled()) {
-            showAccessibilitySetup();
-            return;
-        }
-        openReadyFloatingPanel();
-    }
-
-    private void continueAutomationSetupIfNeeded() {
-        updatePermissionStatus();
-        if (!pendingAutomationSetup) return;
-        if (!Settings.canDrawOverlays(this)) return;
-        if (!isAutomationAccessibilityEnabled()) {
-            if (!accessibilityPromptVisible) {
-                findViewById(R.id.openPanelButton).postDelayed(
-                        this::showAccessibilitySetup, 350);
-            }
-            return;
-        }
-        openReadyFloatingPanel();
-    }
-
-    private void showAccessibilitySetup() {
-        if (isFinishing() || accessibilityPromptVisible) return;
-        accessibilityPromptVisible = true;
-        new AlertDialog.Builder(this)
-                .setTitle("Segundo: ativar os toques")
-                .setMessage("Vou abrir diretamente o serviço “Baixa da Shopee — Automação”. Ative a chave. Se ela aparecer bloqueada no Samsung, volte e use o botão “Samsung bloqueou”.\n\nO quadrado que pode aparecer na borda é um atalho do Samsung, não é o painel. O painel correto tem Play, +, deslize, − e engrenagem, e só toca depois de você apertar Play.")
-                .setNegativeButton("Agora não", (dialog, which) -> {
-                    accessibilityPromptVisible = false;
-                    pendingAutomationSetup = false;
-                })
-                .setNeutralButton("Samsung bloqueou", (dialog, which) -> {
-                    accessibilityPromptVisible = false;
-                    showRestrictedSettingsHelp();
-                })
-                .setPositiveButton("Abrir acessibilidade", (dialog, which) -> {
-                    accessibilityPromptVisible = false;
-                    openExactAccessibilitySettings();
-                })
-                .setOnDismissListener(dialog -> accessibilityPromptVisible = false)
-                .show();
-    }
-
-    private void openExactAccessibilitySettings() {
-        ComponentName service = new ComponentName(this,
-                AutomationAccessibilityService.class);
-        Intent exact = new Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS");
-        exact.putExtra(Intent.EXTRA_COMPONENT_NAME,
-                service.flattenToString());
-        try {
-            startActivity(exact);
-        } catch (Exception ignored) {
-            startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-        }
-    }
-
-    private void openReadyFloatingPanel() {
-        pendingAutomationSetup = false;
-        accessibilityPromptVisible = false;
-        startFloatingPanel(profileManager.getActive(), true);
-        Toast.makeText(this,
-                "Painel aberto. Adicione os alvos e toque em Play quando estiver pronto.",
-                Toast.LENGTH_LONG).show();
-    }
-
-    private void updatePermissionStatus() {
-        if (overlayPermissionChip == null || accessibilityPermissionChip == null) return;
-        boolean overlay = Settings.canDrawOverlays(this);
-        boolean accessibility = isAutomationAccessibilityEnabled();
-        stylePermissionChip(overlayPermissionChip,
-                overlay ? "✓ Sobreposição" : "○ Sobreposição", overlay);
-        stylePermissionChip(accessibilityPermissionChip,
-                accessibility ? "✓ Acessibilidade" : "○ Acessibilidade",
-                accessibility);
-    }
-
-    private void stylePermissionChip(TextView view, String text, boolean enabled) {
-        view.setText(text);
-        GradientDrawable shape = new GradientDrawable();
-        shape.setCornerRadius(dp(20));
-        shape.setColor(enabled ? Color.rgb(39, 122, 91) : 0x26FFFFFF);
-        shape.setStroke(dp(1), enabled ? 0x77FFFFFF : 0x55FFFFFF);
-        view.setBackground(shape);
-        int horizontal = dp(8);
-        int vertical = dp(7);
-        view.setPadding(horizontal, vertical, horizontal, vertical);
-    }
-
-    private void showRestrictedSettingsHelp() {
-        new AlertDialog.Builder(this)
-                .setTitle("Liberar no Samsung")
-                .setMessage("Na tela de informações do aplicativo, toque nos três pontos ⋮ no alto e escolha “Permitir configurações restritas”. Depois volte ao Baixa da Shopee e toque em Painel novamente. Essa confirmação é uma proteção do Android e precisa ser feita por você.")
-                .setNegativeButton("Cancelar", (dialog, which) ->
-                        pendingAutomationSetup = false)
-                .setPositiveButton("Abrir informações do app", (dialog, which) -> {
-                    Intent details = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                            Uri.parse("package:" + getPackageName()));
-                    startActivity(details);
-                }).show();
-    }
-
-    private boolean isAutomationAccessibilityEnabled() {
-        String enabled = Settings.Secure.getString(getContentResolver(),
-                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-        if (enabled == null || enabled.isEmpty()) return false;
-        String component = new ComponentName(this,
-                AutomationAccessibilityService.class).flattenToString();
-        for (String item : enabled.split(":")) {
-            if (component.equalsIgnoreCase(item)) return true;
-        }
-        return false;
-    }
-
-    private void showDeliveryMenu(int position) {
-        List<Delivery> deliveries = store.getDeliveries();
-        if (position < 0 || position >= deliveries.size()) return;
-        selectedIndex = position;
-        Delivery delivery = deliveries.get(position);
-        String occurrenceAction = delivery.hasOccurrence() ? "Alterar ocorrência" : "Colocar em ocorrência";
-        List<String> actionList = new ArrayList<>();
-        actionList.add("Editar nome e endereço");
-        actionList.add(occurrenceAction);
-        if (delivery.hasOccurrence()) actionList.add("Remover ocorrência");
-        actionList.add("Excluir desta rota");
-        String[] actions = actionList.toArray(new String[0]);
-        new AlertDialog.Builder(this)
-                .setTitle(delivery.trackingCode)
-                .setItems(actions, (dialog, which) -> {
-                    if (which == 0) showDeliveryEditor(position);
-                    else if (which == 1) showOccurrencePicker(position);
-                    else if (which == 2 && delivery.hasOccurrence()) {
-                        store.clearOccurrenceAt(position);
-                        refresh();
-                    } else {
-                        confirmRemoveDelivery(position);
-                    }
-                })
-                .setNegativeButton("Fechar", null)
-                .show();
-    }
-
-    private void showDeliveryEditor(int position) {
-        List<Delivery> deliveries = store.getDeliveries();
-        if (position < 0 || position >= deliveries.size()) return;
-        Delivery delivery = deliveries.get(position);
-        LinearLayout form = new LinearLayout(this);
-        form.setOrientation(LinearLayout.VERTICAL);
-        int pad = (int) (20 * getResources().getDisplayMetrics().density);
-        form.setPadding(pad, 0, pad, 0);
-        EditText name = field("Nome da pessoa");
-        EditText address = field("Endereço completo");
-        name.setText(delivery.customerName);
-        address.setText(delivery.address);
-        address.setMinLines(2);
-        form.addView(name);
-        form.addView(address);
-        new AlertDialog.Builder(this)
-                .setTitle("Editar dados desta entrega")
-                .setView(form)
-                .setNegativeButton("Cancelar", null)
-                .setPositiveButton("Salvar", (dialog, which) -> {
-                    store.updateDetailsAt(position, name.getText().toString(), address.getText().toString());
-                    refresh();
-                })
-                .show();
-    }
-
-    private void showOccurrencePicker(int position) {
-        List<String> definitions = occurrenceManager.getItems();
-        List<String> labels = new ArrayList<>(definitions);
-        labels.add("＋ Criar nova definição");
-        new AlertDialog.Builder(this)
-                .setTitle("Ocorrência desta entrega")
-                .setItems(labels.toArray(new String[0]), (dialog, which) -> {
-                    if (which < definitions.size()) {
-                        showOccurrenceNote(position, definitions.get(which));
-                    } else {
-                        EditText input = new EditText(this);
-                        input.setHint("Nome da nova ocorrência");
-                        new AlertDialog.Builder(this)
-                                .setTitle("Nova definição")
-                                .setView(input)
-                                .setNegativeButton("Cancelar", null)
-                                .setPositiveButton("Continuar", (create, selected) -> {
-                                    String value = input.getText().toString().trim();
-                                    if (!value.isEmpty()) {
-                                        occurrenceManager.add(value);
-                                        showOccurrenceNote(position, value);
-                                    }
-                                })
-                                .show();
-                    }
-                })
-                .setNegativeButton("Cancelar", null)
-                .show();
-    }
-
-    private void showOccurrenceNote(int position, String type) {
-        EditText note = new EditText(this);
-        note.setHint("Observação opcional");
-        note.setMinLines(3);
-        Delivery current = store.getDeliveries().get(position);
-        if (type.equals(current.occurrenceType)) note.setText(current.occurrenceNote);
-        int pad = (int) (20 * getResources().getDisplayMetrics().density);
-        note.setPadding(pad, 8, pad, 8);
-        new AlertDialog.Builder(this)
-                .setTitle(type)
-                .setView(note)
-                .setNegativeButton("Cancelar", null)
-                .setPositiveButton("Salvar ocorrência", (dialog, which) -> {
-                    store.markOccurrenceAt(position, type, note.getText().toString());
-                    refresh();
-                })
-                .show();
-    }
-
-    private void startFloatingPanel(AutomationProfile profile, boolean resetPosition) {
-        Intent service = new Intent(this, FloatingAssistantService.class);
-        if (profile != null) service.putExtra(FloatingAssistantService.EXTRA_PROFILE_ID, profile.id);
-        service.putExtra(FloatingAssistantService.EXTRA_RESET_POSITION, resetPosition);
-        startForegroundService(service);
-    }
-
-    private void confirmRemoveDelivery(int position) {
-        Delivery delivery = store.getDeliveries().get(position);
-        new AlertDialog.Builder(this)
-                .setTitle("Excluir " + delivery.trackingCode + " da rota?")
-                .setMessage("A memória permanente da casa não será apagada.")
-                .setNegativeButton("Cancelar", null)
-                .setPositiveButton("Excluir", (dialog, which) -> {
-                    store.removeAt(position);
-                    selectedIndex = Math.max(0, Math.min(position, store.getDeliveries().size() - 1));
-                    refresh();
-                })
-                .show();
-    }
-
-    private void takePhoto(boolean packagePhoto) {
-        if (!isValidSelection()) {
-            Toast.makeText(this, "Selecione uma entrega primeiro", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        Delivery current = store.getDeliveries().get(selectedIndex);
-        if (!packagePhoto && houseStore.findById(current.houseId) == null) {
-            new AlertDialog.Builder(this)
-                    .setTitle("Vincule a casa primeiro")
-                    .setMessage("A foto da fachada fica na memória da casa e poderá ser reconhecida nas próximas rotas.")
-                    .setNegativeButton("Agora não", null)
-                    .setPositiveButton("Vincular casa", (dialog, which) -> showLinkHouseDialog())
-                    .show();
-            return;
-        }
-        pendingPackagePhoto = packagePhoto;
-        pendingPhotoIndex = selectedIndex;
-        String kind = packagePhoto ? "PACOTE" : "FACHADA";
-        Intent camera = new Intent(this, CameraActivity.class);
-        camera.putExtra(CameraActivity.EXTRA_PREFIX, current.trackingCode + "_" + kind);
-        camera.putExtra(CameraActivity.EXTRA_TITLE,
-                packagePhoto ? "Foto do pacote" : "Foto de referência da fachada");
-        startActivityForResult(camera, REQUEST_CAMERA);
-    }
-
-    private void scanQrCode() {
-        if (store.getDeliveries().isEmpty()) {
-            Toast.makeText(this, "Importe a rota antes de escanear", Toast.LENGTH_LONG).show();
-            return;
-        }
-        Intent camera = new Intent(this, CameraActivity.class);
-        camera.putExtra(CameraActivity.EXTRA_PREFIX, "LEITURA_QR");
-        camera.putExtra(CameraActivity.EXTRA_TITLE, "Fotografe o QR Code do pacote");
-        startActivityForResult(camera, REQUEST_QR);
-    }
-
-    private void finishQrScan(Intent data) {
-        if (data == null) return;
-        String uriValue = data.getStringExtra(CameraActivity.EXTRA_PHOTO_URI);
-        if (uriValue == null || uriValue.trim().isEmpty()) return;
-        summaryText.setText("Lendo QR Code offline…");
-        BarcodeReader.scan(this, Uri.parse(uriValue), new BarcodeReader.Callback() {
-            @Override public void onSuccess(String rawValue) {
-                int index = store.findIndexInside(rawValue);
-                if (index < 0) {
-                    refresh();
-                    showError("O QR Code foi lido, mas não corresponde a nenhum pacote da rota.\n\nConteúdo: " + rawValue);
-                    return;
-                }
-                selectedIndex = index;
-                store.setCurrentIndex(index);
-                refresh();
-                Delivery selected = store.getDeliveries().get(index);
-                new AlertDialog.Builder(MainActivity.this)
-                        .setTitle("Pacote selecionado")
-                        .setMessage(selected.trackingCode +
-                                (selected.customerName.isEmpty() ? "" : "\n" + selected.customerName) +
-                                "\n\nDeseja tirar a foto do pacote agora?")
-                        .setNegativeButton("Agora não", null)
-                        .setPositiveButton("Abrir câmera", (dialog, which) -> takePhoto(true))
-                        .show();
-            }
-
-            @Override public void onError(String message) {
-                refresh();
-                showError(message);
-            }
-        });
-    }
-
-    private void finishPhoto(Intent data) {
-        if (data == null || pendingPhotoIndex < 0) return;
-        String uri = data.getStringExtra(CameraActivity.EXTRA_PHOTO_URI);
-        if (uri == null || uri.trim().isEmpty()) return;
-        List<Delivery> deliveries = store.getDeliveries();
-        if (pendingPhotoIndex >= deliveries.size()) return;
-        Delivery delivery = deliveries.get(pendingPhotoIndex);
-        double latitude = data.getDoubleExtra(CameraActivity.EXTRA_LATITUDE, 0);
-        double longitude = data.getDoubleExtra(CameraActivity.EXTRA_LONGITUDE, 0);
-        float accuracy = data.getFloatExtra(CameraActivity.EXTRA_ACCURACY, 0);
-        long capturedAt = data.getLongExtra(CameraActivity.EXTRA_CAPTURED_AT, System.currentTimeMillis());
-        if (pendingPackagePhoto) {
-            store.updatePhotoAt(pendingPhotoIndex, true, uri);
-        } else {
-            House house = houseStore.findById(delivery.houseId);
-            if (house != null) {
-                houseStore.updateFacade(house.id, uri);
-                store.syncHouseFacade(house.id, uri);
-            }
-        }
-        if (latitude != 0 || longitude != 0) {
-            store.updateLocationAt(pendingPhotoIndex, latitude, longitude, accuracy, capturedAt);
-            if (!delivery.houseId.isEmpty()) {
-                houseStore.updateLocation(delivery.houseId, latitude, longitude, accuracy, capturedAt);
-            }
-        }
-
-        List<Delivery> updated = store.getDeliveries();
-        Delivery saved = updated.get(pendingPhotoIndex);
-        House savedHouse = houseStore.findById(saved.houseId);
-        boolean hasFacade = savedHouse != null && !savedHouse.facadePhotoUri.isEmpty();
-        if (!saved.packagePhotoUri.isEmpty() && hasFacade && pendingPhotoIndex + 1 < updated.size()) {
-            selectedIndex = pendingPhotoIndex + 1;
-            Toast.makeText(this, "Fotos prontas • próximo pacote selecionado", Toast.LENGTH_SHORT).show();
-        } else {
-            Toast.makeText(this, pendingPackagePhoto ? "Foto do pacote salva" : "Fachada salva na memória da casa",
-                    Toast.LENGTH_SHORT).show();
-        }
-        pendingPhotoIndex = -1;
-        refresh();
-    }
-
-    private void showHouseMemory() {
-        List<House> houses = houseStore.getHouses();
-        List<String> labels = new ArrayList<>();
-        labels.add("＋ Cadastrar nova casa");
-        for (House house : houses) {
-            labels.add(house.displayName() + (house.address.isEmpty() ? "" : "\n" + house.address));
-        }
-        new AlertDialog.Builder(this)
-                .setTitle("Memória de casas • " + houses.size())
-                .setItems(labels.toArray(new String[0]), (dialog, which) -> {
-                    if (which == 0) showHouseEditor(null, -1);
-                    else showHouseEditor(houses.get(which - 1), -1);
-                })
-                .setNegativeButton("Fechar", null)
-                .show();
-    }
-
-    private void showLinkHouseDialog() {
-        if (!isValidSelection()) {
-            Toast.makeText(this, "Selecione uma entrega primeiro", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        Delivery delivery = store.getDeliveries().get(selectedIndex);
-        House linked = houseStore.findById(delivery.houseId);
-        List<House> houses = houseStore.getHouses();
-        List<String> labels = new ArrayList<>();
-        labels.add("＋ Cadastrar nova casa e vincular");
-        if (linked != null) labels.add("✎ Editar a casa atual: " + linked.displayName());
-        if (linked != null) labels.add("× Remover vínculo desta entrega");
-        int fixed = labels.size();
-        for (House house : houses) labels.add("Vincular: " + house.displayName() +
-                (house.address.isEmpty() ? "" : "\n" + house.address));
-
-        new AlertDialog.Builder(this)
-                .setTitle(linked == null ? "Vincular uma casa" : "Casa atual: " + linked.displayName())
-                .setItems(labels.toArray(new String[0]), (dialog, which) -> {
-                    if (which == 0) {
-                        showHouseEditor(null, selectedIndex);
-                    } else if (linked != null && which == 1) {
-                        showHouseEditor(linked, selectedIndex);
-                    } else if (linked != null && which == 2) {
-                        store.linkHouseAt(selectedIndex, "");
-                        refresh();
-                    } else {
-                        House chosen = houses.get(which - fixed);
-                        store.linkHouseAt(selectedIndex, chosen.id);
-                        refresh();
-                        Toast.makeText(this, "Entrega vinculada a " + chosen.displayName(), Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton("Cancelar", null)
-                .show();
-    }
-
-    private void showHouseEditor(House existing, int linkIndex) {
-        LinearLayout form = new LinearLayout(this);
-        form.setOrientation(LinearLayout.VERTICAL);
-        int pad = (int) (20 * getResources().getDisplayMetrics().density);
-        form.setPadding(pad, 4, pad, 0);
-        EditText label = field("Apelido da casa (ex.: Casa de Maria)");
-        EditText residents = field("Moradores / pessoas deste endereço");
-        EditText address = field("Endereço completo, com número");
-        EditText map = field("Link do Google Maps ou Waze (opcional)");
-        EditText notes = field("Observações (portão, referência, etc.)");
-        notes.setMinLines(2);
-        if (existing != null) {
-            label.setText(existing.label);
-            residents.setText(existing.residents);
-            address.setText(existing.address);
-            map.setText(existing.mapUri);
-            notes.setText(existing.notes);
-        } else if (linkIndex >= 0 && linkIndex < store.getDeliveries().size()) {
-            Delivery delivery = store.getDeliveries().get(linkIndex);
-            if (!delivery.customerName.isEmpty()) {
-                label.setText("Casa de " + delivery.customerName);
-                residents.setText(delivery.customerName);
-            }
-            address.setText(delivery.address);
-            if (delivery.hasDestinationLocation()) {
-                map.setText(String.format(Locale.US, "geo:%.6f,%.6f?q=%.6f,%.6f",
-                        delivery.destinationLatitude, delivery.destinationLongitude,
-                        delivery.destinationLatitude, delivery.destinationLongitude));
-            }
-        }
-        form.addView(label); form.addView(residents); form.addView(address); form.addView(map); form.addView(notes);
-
-        ScrollView scroll = new ScrollView(this);
-        scroll.addView(form);
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(existing == null ? "Cadastrar casa" : "Editar " + existing.displayName())
-                .setView(scroll)
-                .setNegativeButton("Cancelar", null)
-                .setPositiveButton("Salvar", null)
-                .setNeutralButton(existing == null ? null : "Excluir", null)
-                .create();
-        dialog.setOnShowListener(ignored -> {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-                String labelValue = label.getText().toString().trim();
-                String addressValue = address.getText().toString().trim();
-                if (labelValue.isEmpty() && addressValue.isEmpty()) {
-                    label.setError("Informe um apelido ou endereço");
-                    return;
-                }
-                House house = existing == null
-                        ? House.create(labelValue, residents.getText().toString(), addressValue,
-                        map.getText().toString(), notes.getText().toString())
-                        : new House(existing.id, labelValue, residents.getText().toString(), addressValue,
-                        map.getText().toString(), existing.facadePhotoUri, notes.getText().toString(),
-                        existing.latitude, existing.longitude, existing.locationAccuracy, existing.lastVisitedAt);
-                houseStore.save(house);
-                if (linkIndex >= 0) store.linkHouseAt(linkIndex, house.id);
-                dialog.dismiss();
-                refresh();
-                Toast.makeText(this, "Casa salva na memória", Toast.LENGTH_SHORT).show();
-            });
-            if (existing != null) dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v ->
-                    new AlertDialog.Builder(this)
-                            .setTitle("Excluir esta casa da memória?")
-                            .setMessage("Os códigos da rota serão apenas desvinculados. A foto que já está na galeria não será apagada.")
-                            .setNegativeButton("Cancelar", null)
-                            .setPositiveButton("Excluir", (confirm, which) -> {
-                                store.unlinkHouseEverywhere(existing.id);
-                                houseStore.delete(existing.id);
-                                dialog.dismiss();
-                                refresh();
-                            }).show());
-        });
-        dialog.show();
-    }
-
-    private EditText field(String hint) {
-        EditText field = new EditText(this);
-        field.setHint(hint);
-        field.setSingleLine(false);
-        field.setMaxLines(3);
-        return field;
-    }
-
-    private void openNavigation() {
-        if (!isValidSelection()) return;
-        Delivery delivery = store.getDeliveries().get(selectedIndex);
-        House house = houseStore.findById(delivery.houseId);
-        String mapUri = house == null ? "" : house.mapUri;
-        String address = house != null && !house.address.isEmpty() ? house.address : delivery.address;
-        Uri destination;
-        if (!mapUri.isEmpty()) {
-            destination = Uri.parse(mapUri.matches("^[A-Za-z][A-Za-z0-9+.-]*:.*") ? mapUri : "https://" + mapUri);
-        } else if (delivery.hasDestinationLocation()) {
-            String coordinates = String.format(Locale.US, "%.6f,%.6f",
-                    delivery.destinationLatitude, delivery.destinationLongitude);
-            destination = Uri.parse("geo:" + coordinates + "?q=" + Uri.encode(coordinates));
-        } else if (!address.isEmpty()) {
-            destination = Uri.parse("geo:0,0?q=" + Uri.encode(address));
-        } else {
-            Toast.makeText(this, "Cadastre o endereço ou o link do mapa desta casa", Toast.LENGTH_LONG).show();
-            return;
-        }
-        Intent view = new Intent(Intent.ACTION_VIEW, destination);
-        if (view.resolveActivity(getPackageManager()) == null) {
-            Toast.makeText(this, "Nenhum aplicativo de mapas foi encontrado", Toast.LENGTH_LONG).show();
-            return;
-        }
-        startActivity(Intent.createChooser(view, "Abrir rota com"));
-    }
-
-    private void chooseExportDestination() {
-        if (store.getDeliveries().isEmpty()) {
-            Toast.makeText(this, "Não há lista para exportar", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("text/csv");
-        intent.putExtra(Intent.EXTRA_TITLE, "entregas_com_memoria.csv");
-        startActivityForResult(intent, REQUEST_EXPORT);
-    }
-
-    private void handleReport() {
-        if (!isValidSelection()) return;
-        Delivery delivery = store.getDeliveries().get(selectedIndex);
-        if (delivery.reportUri.isEmpty()) {
-            generateReport(selectedIndex);
-            return;
-        }
-        new AlertDialog.Builder(this)
-                .setTitle("Relatório desta entrega")
-                .setItems(new String[]{"Abrir último PDF", "Gerar PDF atualizado"}, (dialog, which) -> {
-                    if (which == 0) openReport(delivery.reportUri);
-                    else generateReport(selectedIndex);
-                })
-                .setNegativeButton("Cancelar", null)
-                .show();
-    }
-
-    private void generateReport(int index) {
-        List<Delivery> deliveries = store.getDeliveries();
-        if (index < 0 || index >= deliveries.size()) return;
-        Delivery delivery = deliveries.get(index);
-        if (delivery.packagePhotoUri.isEmpty()) {
-            Toast.makeText(this, "Tire primeiro a foto do pacote", Toast.LENGTH_LONG).show();
-            return;
-        }
-        House house = houseStore.findById(delivery.houseId);
-        generatePdfButton.setEnabled(false);
-        generatePdfButton.setText("Gerando PDF…");
-        new Thread(() -> {
-            try {
-                Uri report = DeliveryReportGenerator.generate(this, delivery, house);
-                store.updateReportAt(index, report.toString());
-                runOnUiThread(() -> {
-                    refresh();
-                    Toast.makeText(this, "PDF salvo em Documentos/BaixaDaShopee/Entregas", Toast.LENGTH_LONG).show();
-                    openReport(report.toString());
-                });
-            } catch (Exception error) {
-                runOnUiThread(() -> {
-                    refresh();
-                    showError("Falha ao gerar PDF: " + error.getMessage());
-                });
-            }
-        }).start();
-    }
-
-    private void openReport(String uriValue) {
-        try {
-            Intent view = new Intent(Intent.ACTION_VIEW);
-            view.setDataAndType(Uri.parse(uriValue), "application/pdf");
-            view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(Intent.createChooser(view, "Abrir relatório com"));
-        } catch (Exception error) {
-            Toast.makeText(this, "PDF salvo, mas nenhum leitor de PDF foi encontrado", Toast.LENGTH_LONG).show();
-        }
-    }
-
-    private void exportCsv(Uri uri) {
-        try (OutputStream output = getContentResolver().openOutputStream(uri)) {
-            if (output == null) throw new IllegalStateException("Não foi possível criar o arquivo.");
-            output.write(new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
-            StringBuilder csv = new StringBuilder("codigo_rastreio;nome;endereco;codigo_numerico;at_id;stop;bairro;cidade;cep;latitude_destino;longitude_destino;status;ocorrencia;observacao_ocorrencia;casa;link_mapa;latitude_foto;longitude_foto;precisao_metros;horario_foto;foto_pacote;foto_fachada;relatorio_pdf\r\n");
-            for (Delivery delivery : store.getDeliveries()) {
-                House house = houseStore.findById(delivery.houseId);
-                String name = house != null && !house.residents.isEmpty() ? house.residents : delivery.customerName;
-                String address = house != null && !house.address.isEmpty() ? house.address : delivery.address;
-                csv.append(csvCell(delivery.trackingCode)).append(';')
-                        .append(csvCell(name)).append(';')
-                        .append(csvCell(address)).append(';')
-                        .append(csvCell(delivery.numericCode())).append(';')
-                        .append(csvCell(delivery.atId)).append(';')
-                        .append(csvCell(delivery.stop)).append(';')
-                        .append(csvCell(delivery.neighborhood)).append(';')
-                        .append(csvCell(delivery.city)).append(';')
-                        .append(csvCell(delivery.postalCode)).append(';')
-                        .append(csvCell(delivery.hasDestinationLocation() ? String.valueOf(delivery.destinationLatitude) : "")).append(';')
-                        .append(csvCell(delivery.hasDestinationLocation() ? String.valueOf(delivery.destinationLongitude) : "")).append(';')
-                        .append(csvCell(delivery.status)).append(';')
-                        .append(csvCell(delivery.occurrenceType)).append(';')
-                        .append(csvCell(delivery.occurrenceNote)).append(';')
-                        .append(csvCell(house == null ? "" : house.displayName())).append(';')
-                        .append(csvCell(house == null ? "" : house.mapUri)).append(';')
-                        .append(csvCell(delivery.hasLocation() ? String.valueOf(delivery.latitude) : "")).append(';')
-                        .append(csvCell(delivery.hasLocation() ? String.valueOf(delivery.longitude) : "")).append(';')
-                        .append(csvCell(delivery.hasLocation() ? String.valueOf(delivery.locationAccuracy) : "")).append(';')
-                        .append(csvCell(delivery.photographedAt == 0 ? "" : new SimpleDateFormat(
-                                "dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(new Date(delivery.photographedAt)))).append(';')
-                        .append(csvCell(delivery.packagePhotoUri)).append(';')
-                        .append(csvCell(house == null ? delivery.facadePhotoUri : house.facadePhotoUri)).append(';')
-                        .append(csvCell(delivery.reportUri)).append("\r\n");
-            }
-            output.write(csv.toString().getBytes(StandardCharsets.UTF_8));
-            Toast.makeText(this, "Lista com a memória das casas exportada", Toast.LENGTH_LONG).show();
-        } catch (Exception error) {
-            showError(error.getMessage());
-        }
-    }
-
-    private String csvCell(String value) {
-        String safe = value == null ? "" : value;
-        return "\"" + safe.replace("\"", "\"\"") + "\"";
-    }
-
-    private String queryDisplayName(Uri uri) {
-        try (Cursor cursor = getContentResolver().query(uri, null, null, null, null)) {
-            if (cursor != null && cursor.moveToFirst()) {
-                int index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
-                if (index >= 0) return cursor.getString(index);
-            }
-        }
-        return "planilha";
-    }
-
-    private void refresh() {
-        List<Delivery> deliveries = store.getDeliveries();
-        int index = store.getCurrentIndex();
-        if (!deliveries.isEmpty()) selectedIndex = Math.max(0, Math.min(selectedIndex, deliveries.size() - 1));
-        updatePermissionStatus();
-        renderDeliveryList(deliveries);
-
-        if (deliveries.isEmpty()) {
-            summaryText.setText("Nenhuma rota carregada • " + houseStore.getHouses().size() + " casas salvas");
-            deliverySectionTitle.setText("Entregas da rota");
-            currentDeliveryText.setText("Importe uma lista para começar.");
-            setDeliveryActionsEnabled(false);
-            showPreview(packagePreview, "");
-            showPreview(facadePreview, "");
-            return;
-        }
-
-        String keyboardPosition = index >= deliveries.size() ? "concluída" : (index + 1) + " de " + deliveries.size();
-        summaryText.setText("Teclado: " + keyboardPosition + " • Rota: " + (selectedIndex + 1) + " de " + deliveries.size());
-        deliverySectionTitle.setText("Entregas da rota • " + deliveries.size());
-        Delivery current = deliveries.get(selectedIndex);
-        House house = houseStore.findById(current.houseId);
-        String name = house != null && !house.residents.isEmpty() ? house.residents : current.customerName;
-        if ("-".equals(name.trim())) name = "";
-        String address = house != null && !house.address.isEmpty() ? house.address : current.address;
-        StringBuilder text = new StringBuilder();
-        text.append(current.trackingCode).append("\nSomente números: ").append(current.numericCode());
-        if (house != null) text.append("\nCasa: ").append(house.displayName());
-        if (!name.isEmpty()) text.append("\nPessoa(s): ").append(name);
-        if (!address.isEmpty()) text.append("\n").append(address);
-        if (current.hasDestinationLocation()) text.append(String.format(Locale.getDefault(),
-                "\nDestino da planilha: %.6f, %.6f",
-                current.destinationLatitude, current.destinationLongitude));
-        if (current.hasLocation()) text.append(String.format(Locale.getDefault(),
-                "\nGPS da foto: %.6f, %.6f (±%.0f m)", current.latitude, current.longitude, current.locationAccuracy));
-        if (current.hasOccurrence()) {
-            text.append("\nOcorrência: ").append(current.occurrenceType);
-            if (!current.occurrenceNote.isEmpty()) text.append(" — ").append(current.occurrenceNote);
-        }
-        currentDeliveryText.setText(text.toString());
-        setDeliveryActionsEnabled(true);
-
-        String facade = house == null ? current.facadePhotoUri : house.facadePhotoUri;
-        packagePhotoButton.setText(current.packagePhotoUri.isEmpty() ? "Foto do pacote" : "✓ Foto do pacote");
-        facadePhotoButton.setText(facade.isEmpty() ? "Foto da fachada" : "✓ Fachada na memória");
-        linkHouseButton.setText(house == null ? "Vincular casa" : "Casa: " + house.displayName());
-        navigationButton.setText((house != null && !house.mapUri.isEmpty()) || current.hasDestinationLocation()
-                ? "Abrir destino da rota" : "Abrir no mapa");
-        generatePdfButton.setText(current.reportUri.isEmpty() ? "Gerar PDF desta entrega" : "✓ Abrir ou atualizar PDF");
-        showPreview(packagePreview, current.packagePhotoUri);
-        showPreview(facadePreview, facade);
-    }
-
-    private void renderDeliveryList(List<Delivery> deliveries) {
-        if (deliveryContainer == null) return;
-        deliveryContainer.removeAllViews();
-        if (deliveries.isEmpty()) {
-            TextView empty = new TextView(this);
-            empty.setText("Sua rota aparecerá aqui depois da importação.");
-            empty.setTextColor(getColor(R.color.muted));
-            empty.setTextSize(14);
-            empty.setGravity(Gravity.CENTER);
-            empty.setPadding(dp(12), dp(28), dp(12), dp(28));
-            deliveryContainer.addView(empty);
-            return;
-        }
-        LayoutInflater inflater = LayoutInflater.from(this);
-        for (int position = 0; position < deliveries.size(); position++) {
-            Delivery item = deliveries.get(position);
-            View card = inflater.inflate(R.layout.item_delivery, deliveryContainer, false);
-            TextView itemPosition = card.findViewById(R.id.itemPosition);
-            TextView itemCode = card.findViewById(R.id.itemCode);
-            TextView itemName = card.findViewById(R.id.itemName);
-            TextView itemAddress = card.findViewById(R.id.itemAddress);
-            TextView itemPhotoStatus = card.findViewById(R.id.itemPhotoStatus);
-            TextView itemMenu = card.findViewById(R.id.itemMenu);
-            itemPosition.setText(String.valueOf(position + 1));
-            itemCode.setText(item.trackingCode);
-            House house = houseStore.findById(item.houseId);
-            String name = house != null && !house.residents.isEmpty()
-                    ? house.residents : item.customerName;
-            if ("-".equals(name.trim())) name = "";
-            String address = house != null && !house.address.isEmpty()
-                    ? house.address : item.address;
-            String facade = house == null ? item.facadePhotoUri : house.facadePhotoUri;
-            itemName.setText(name);
-            itemName.setVisibility(name.isEmpty() ? View.GONE : View.VISIBLE);
-            itemAddress.setText(address);
-            itemAddress.setVisibility(address.isEmpty() ? View.GONE : View.VISIBLE);
-            itemPhotoStatus.setText(
-                    (item.hasOccurrence() ? "⚠ " : "")
-                            + (item.packagePhotoUri.isEmpty() ? "📦○" : "📦✓") + " "
-                            + (facade.isEmpty() ? "🏠○" : "🏠✓"));
-            final int selected = position;
-            card.setOnClickListener(v -> {
-                selectedIndex = selected;
-                refresh();
-            });
-            itemMenu.setOnClickListener(v -> showDeliveryMenu(selected));
-            card.setBackgroundResource(position == selectedIndex
-                    ? R.drawable.delivery_card_selected : R.drawable.delivery_card);
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            params.bottomMargin = dp(9);
-            card.setLayoutParams(params);
-            deliveryContainer.addView(card);
-        }
-    }
-
-    private void setDeliveryActionsEnabled(boolean enabled) {
-        packagePhotoButton.setEnabled(enabled);
-        facadePhotoButton.setEnabled(enabled);
-        linkHouseButton.setEnabled(enabled);
-        navigationButton.setEnabled(enabled);
-        generatePdfButton.setEnabled(enabled);
-        findViewById(R.id.useInKeyboardButton).setEnabled(enabled);
-        findViewById(R.id.exportButton).setEnabled(enabled);
-    }
-
-    private void showPreview(ImageView view, String uri) {
-        if (uri == null || uri.isEmpty()) {
-            view.setImageDrawable(null);
-            view.setVisibility(View.GONE);
-            return;
-        }
-        try {
-            view.setImageURI(null);
-            view.setImageURI(Uri.parse(uri));
-            view.setVisibility(View.VISIBLE);
-        } catch (Exception ignored) {
-            view.setVisibility(View.GONE);
-        }
-    }
-
-    private boolean isValidSelection() {
-        return selectedIndex >= 0 && selectedIndex < store.getDeliveries().size();
-    }
-
-    private void showError(String message) {
-        new AlertDialog.Builder(this)
-                .setTitle("Não foi possível continuar")
-                .setMessage(message == null || message.trim().isEmpty() ? "Ocorreu um erro inesperado." : message)
-                .setPositiveButton("OK", null)
-                .show();
-    }
-
-    private int dp(int value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    private void takePhoto(boolean forPackage) {
+        Delivery current = getSelectedDelivery();
+        Intent intent = new Intent(this, CameraActivity.class);
+        intent.putExtra(CameraActivity.EXTRA_PREFIX, forPackage ? "PACOTE_" : "CASA_");
+        intent.putExtra(CameraActivity.EXTRA_TITLE, forPackage ? "Foto do pacote" : "Foto da fachada da casa");
+        startActivityForResult(intent, forPackage ? REQUEST_CAMERA_PACKAGE : REQUEST_CAMERA_FACADE);
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_IMPORT && resultCode == RESULT_OK && data != null && data.getData() != null) {
-            importSpreadsheet(data.getData());
-        } else if (requestCode == REQUEST_CAMERA && resultCode == RESULT_OK) {
-            finishPhoto(data);
-        } else if (requestCode == REQUEST_EXPORT && resultCode == RESULT_OK && data != null && data.getData() != null) {
-            exportCsv(data.getData());
-        } else if (requestCode == REQUEST_QR && resultCode == RESULT_OK) {
-            finishQrScan(data);
+        if (resultCode != RESULT_OK || data == null) return;
+
+        if (requestCode == REQUEST_IMPORT) {
+            Uri uri = data.getData();
+            if (uri != null) importSpreadsheet(uri);
+        } else if (requestCode == REQUEST_CAMERA_PACKAGE) {
+            String photoUri = data.getStringExtra(CameraActivity.EXTRA_PHOTO_URI);
+            if (photoUri != null && !photoUri.isEmpty()) {
+                store.updatePhotoAt(selectedIndex, true, photoUri);
+                refreshRoute();
+            }
+        } else if (requestCode == REQUEST_CAMERA_FACADE) {
+            String photoUri = data.getStringExtra(CameraActivity.EXTRA_PHOTO_URI);
+            if (photoUri != null && !photoUri.isEmpty()) {
+                Delivery current = getSelectedDelivery();
+                if (current != null && current.houseId != null && !current.houseId.isEmpty()) {
+                    houseStore.updateFacade(current.houseId, photoUri);
+                }
+                store.updatePhotoAt(selectedIndex, false, photoUri);
+                refreshRoute();
+            }
+        } else if (requestCode == REQUEST_PICK_GALLERY) {
+            List<Uri> uris = new ArrayList<>();
+            if (data.getClipData() != null) {
+                int count = data.getClipData().getItemCount();
+                for (int i = 0; i < count; i++) {
+                    uris.add(data.getClipData().getItemAt(i).getUri());
+                }
+            } else if (data.getData() != null) {
+                uris.add(data.getData());
+            }
+
+            if (!uris.isEmpty()) {
+                photoProgressText.setVisibility(View.VISIBLE);
+                photoProgressText.setText("Processando " + uris.size() + " imagem(ns)...");
+                photoProcessor.processGalleryBatch(uris, new PhotoProcessor.ProgressCallback() {
+                    @Override
+                    public void onProgress(int current, int total) {
+                        photoProgressText.setText("Processando foto " + current + " de " + total + "...");
+                    }
+
+                    @Override
+                    public void onComplete(int total, int assigned, int pending, int duplicates) {
+                        photoProgressText.setVisibility(View.GONE);
+                        String msg = total + " fotos processadas\n" +
+                                assigned + " atribuídas automaticamente\n" +
+                                pending + " sem destinatário\n" +
+                                (duplicates > 0 ? duplicates + " duplicadas ignoradas" : "");
+                        new AlertDialog.Builder(MainActivity.this)
+                                .setTitle("Processamento Concluído")
+                                .setMessage(msg)
+                                .setPositiveButton("OK", null)
+                                .show();
+                        loadPendingPhotos();
+                        refreshRoute();
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        photoProgressText.setVisibility(View.GONE);
+                        Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        } else if (requestCode == REQUEST_EXPORT_HOUSES) {
+            Uri uri = data.getData();
+            if (uri != null) exportHousesToUri(uri);
         }
+    }
+
+    private void importSpreadsheet(Uri uri) {
+        summaryText.setText("Importando planilha...");
+        executor.execute(() -> {
+            try (InputStream input = getContentResolver().openInputStream(uri)) {
+                if (input == null) throw new IllegalStateException("Não foi possível abrir o arquivo.");
+                List<Delivery> imported = SpreadsheetImporter.importFile(input, uri.getLastPathSegment());
+                runOnUiThread(() -> {
+                    repository.importNewRoute(imported);
+                    selectedIndex = 0;
+                    refreshAll();
+                    Toast.makeText(this, "Rota importada (" + imported.size() + " entregas encontradas)", Toast.LENGTH_LONG).show();
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> {
+                    refreshRoute();
+                    new AlertDialog.Builder(this)
+                            .setTitle("Erro na importação")
+                            .setMessage(error.getMessage())
+                            .setPositiveButton("OK", null)
+                            .show();
+                });
+            }
+        });
+    }
+
+    private void refreshAll() {
+        refreshRoute();
+        loadPendingPhotos();
+        loadArchiveData();
+        loadSettingsData();
+    }
+
+    private abstract static class SimpleTextWatcher implements android.text.TextWatcher {
+        @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+        @Override public void afterTextChanged(android.text.Editable s) {}
     }
 }

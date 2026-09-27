@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Baixa da Shopee</string>
-    <string name="keyboard_name">Baixa da Shopee</string>
+    <string name="app_name">Baixas de Pacote</string>
+    <string name="keyboard_name">Teclado das baixas</string>
     <string name="accessibility_description">Executa somente após Play os toques e deslizes que o usuário criou e salvou no painel flutuante.</string>
 </resources>

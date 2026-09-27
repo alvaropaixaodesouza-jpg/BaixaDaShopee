@@ -1,14 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/keyboardRootContainer"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@color/cream"
     android:orientation="vertical"
     android:paddingStart="8dp"
-    android:paddingTop="8dp"
+    android:paddingTop="6dp"
     android:paddingEnd="8dp"
-    android:paddingBottom="8dp">
+    android:paddingBottom="6dp">
 
+    <!-- Cabeçalho: Progresso da Pessoa e do Pacote -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -20,128 +22,201 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Entrega 1 de 1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="Pessoa 1/1 • Pacote 1/1"
             android:textColor="@color/ink"
-            android:textSize="14sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
 
+        <TextView
+            android:id="@+id/keyboardStatusHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Teclado das baixas"
+            android:textColor="@color/muted"
+            android:textSize="11sp" />
     </LinearLayout>
 
+    <!-- Nome real do destinatário -->
     <TextView
         android:id="@+id/keyboardPersonName"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="2dp"
         android:ellipsize="end"
         android:maxLines="1"
-        android:text="Nome da pessoa"
+        android:text="Nome do Destinatário"
         android:textColor="@color/ink"
         android:textSize="16sp"
         android:textStyle="bold" />
 
+    <!-- Endereço da entrega -->
     <TextView
         android:id="@+id/keyboardAddress"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
         android:ellipsize="end"
-        android:maxLines="2"
-        android:text="Endereço da entrega"
+        android:maxLines="1"
+        android:text="Endereço"
         android:textColor="@color/muted"
-        android:textSize="13sp" />
+        android:textSize="12sp" />
 
-    <Button
-        android:id="@+id/trackingButton"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:layout_marginTop="6dp"
-        android:background="@drawable/button_primary"
-        android:gravity="center"
-        android:text="CÓDIGO COMPLETO"
-        android:textAllCaps="false"
-        android:textColor="@color/white"
-        android:textSize="16sp"
-        android:textStyle="bold" />
-
-    <Button
-        android:id="@+id/numericButton"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:layout_marginTop="7dp"
-        android:background="@drawable/button_secondary"
-        android:gravity="center"
-        android:text="SOMENTE NÚMEROS"
-        android:textAllCaps="false"
-        android:textColor="@color/orange_dark"
-        android:textSize="16sp"
-        android:textStyle="bold" />
-
-    <Button
-        android:id="@+id/nameButton"
-        android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:layout_marginTop="7dp"
-        android:background="@drawable/button_secondary"
-        android:gravity="center"
-        android:text="NOME DO RECEBEDOR"
-        android:textAllCaps="false"
-        android:textColor="@color/orange_dark"
-        android:textSize="15sp"
-        android:textStyle="bold" />
-
+    <!-- LINHA 1: BR | RG | NOME -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="7dp"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="5dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/trackingButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/button_primary"
+            android:text="BR"
+            android:textAllCaps="false"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <Space
+            android:layout_width="5dp"
+            android:layout_height="1dp" />
+
+        <Button
+            android:id="@+id/numericButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/button_secondary"
+            android:text="RG"
+            android:textAllCaps="false"
+            android:textColor="@color/orange_dark"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <Space
+            android:layout_width="5dp"
+            android:layout_height="1dp" />
+
+        <Button
+            android:id="@+id/nameButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/button_secondary"
+            android:text="Nome"
+            android:textAllCaps="false"
+            android:textColor="@color/orange_dark"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- LINHA 2: Pacote | Casa | Desfazer -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="5dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/keyboardPackageButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/button_secondary"
+            android:text="📦 Pacote"
+            android:textAllCaps="false"
+            android:textColor="@color/ink"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <Space
+            android:layout_width="5dp"
+            android:layout_height="1dp" />
+
+        <Button
+            android:id="@+id/keyboardHouseButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/button_secondary"
+            android:text="🏠 Casa"
+            android:textAllCaps="false"
+            android:textColor="@color/ink"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <Space
+            android:layout_width="5dp"
+            android:layout_height="1dp" />
+
+        <Button
+            android:id="@+id/keyboardUndoButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/button_secondary"
+            android:text="↶ Desfazer"
+            android:textAllCaps="false"
+            android:textColor="@color/orange_dark"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- LINHA 3: Anterior | Próximo | Teclado -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="5dp"
         android:orientation="horizontal">
 
         <Button
             android:id="@+id/previousButton"
             android:layout_width="0dp"
-            android:layout_height="46dp"
+            android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@drawable/button_secondary"
-            android:text="← Voltar"
+            android:text="◀ Voltar"
             android:textAllCaps="false"
-            android:textColor="@color/ink" />
+            android:textColor="@color/ink"
+            android:textSize="13sp" />
 
         <Space
-            android:layout_width="6dp"
+            android:layout_width="5dp"
             android:layout_height="1dp" />
 
         <Button
             android:id="@+id/nextButton"
             android:layout_width="0dp"
-            android:layout_height="46dp"
-            android:layout_weight="1"
-            android:background="@drawable/button_secondary"
-            android:text="Próxima →"
+            android:layout_height="match_parent"
+            android:layout_weight="1.2"
+            android:background="@drawable/button_primary"
+            android:text="Próximo ▶"
             android:textAllCaps="false"
-            android:textColor="@color/ink" />
+            android:textColor="@color/white"
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
         <Space
-            android:layout_width="6dp"
+            android:layout_width="5dp"
             android:layout_height="1dp" />
 
         <Button
             android:id="@+id/switchKeyboardButton"
             android:layout_width="0dp"
-            android:layout_height="46dp"
+            android:layout_height="match_parent"
             android:layout_weight="1"
             android:background="@drawable/button_secondary"
-            android:text="⌨ Teclado"
+            android:text="⌨ Trocar"
             android:textAllCaps="false"
-            android:textColor="@color/ink" />
+            android:textColor="@color/ink"
+            android:textSize="13sp" />
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/keyboardHint"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="5dp"
-        android:gravity="center"
-        android:text="Avança quando os três dados forem inseridos"
-        android:textColor="@color/muted"
-        android:textSize="11sp" />
 
 </LinearLayout>
