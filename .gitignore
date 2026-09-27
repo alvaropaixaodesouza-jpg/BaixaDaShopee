@@ -5,6 +5,7 @@ build/
 app/build/
 dist/
 *.apk
+!BaixasDePacote-v0.8.0.apk
 *.aab
 *.jks
 *.keystore
