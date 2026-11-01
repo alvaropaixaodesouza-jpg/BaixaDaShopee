@@ -78,6 +78,7 @@ class TrackingImeService : InputMethodService() {
     private var active = false
     private var enabled = true
     private var sending = false
+    private var binding = false
     private var lastCandidate = ""
     private var lastCandidateAt = 0L
     private var lastScannedAt = 0L
@@ -165,6 +166,9 @@ class TrackingImeService : InputMethodService() {
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info,restarting)
+        active = true
+        owner.visible()
+        previewView?.post { startCamera() }
         handler.post { render();sendQueue() }
     }
     override fun onWindowShown() {
@@ -210,14 +214,16 @@ class TrackingImeService : InputMethodService() {
     }
 
     private fun startCamera() {
-        if(!active || previewView==null) return
+        if(!active || previewView==null || camera!=null || binding) return
+        if(passwordField()) { setStatus("Campo protegido: câmera desativada");return }
         if(ContextCompat.checkSelfPermission(this,Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             setStatus("Permita a câmera abrindo o aplicativo Leitor de Rastreios BR")
             return
         }
+        binding=true
         val future=ProcessCameraProvider.getInstance(this)
         future.addListener({
-            if(!active || previewView==null) return@addListener
+            if(!active || previewView==null || camera!=null) { binding=false;return@addListener }
             try {
                 val cp=future.get()
                 provider=cp
@@ -232,6 +238,7 @@ class TrackingImeService : InputMethodService() {
                 camera=cp.bindToLifecycle(owner,CameraSelector.DEFAULT_BACK_CAMERA,preview,analysis)
                 setStatus(if(enabled) "Câmera ativa • aproxime o pacote" else "Câmera ativa • leitura pausada")
             } catch(e:Exception) { setStatus("Erro ao abrir a câmera: " + e.message) }
+            finally { binding=false }
         },ContextCompat.getMainExecutor(this))
     }
     private fun stopCamera() {
@@ -312,10 +319,9 @@ class TrackingImeService : InputMethodService() {
         handler.postDelayed({
             try {
                 // Envia Enter ao MESMO campo que recebeu o código.
-                if(!connection.performEditorAction(EditorInfo.IME_ACTION_GO)) {
-                    connection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_ENTER))
-                    connection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_ENTER))
-                }
+                val down=connection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_ENTER))
+                connection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_ENTER))
+                if(!down) connection.performEditorAction(EditorInfo.IME_ACTION_DONE)
                 QueueStore.pop(this)
                 setStatus("Enviado + Enter: "+first)
             } catch(e:Exception) {
