@@ -1,8 +1,8 @@
-name: Leitor de Rastreios BR APK (Câmera no Teclado)
+name: Leitor Rastreios BR APK v1.2 (Bip e Limpar)
 on:
   push:
     branches:
-      - feature/camera-dentro-teclado
+      - feature/limpar-lista-bip-teclado
     paths:
       - 'LeitorRastreiosBR/**'
       - '.github/workflows/leitor-rastreios-br.yml'
