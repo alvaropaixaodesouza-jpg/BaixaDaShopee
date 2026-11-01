@@ -86,7 +86,7 @@ class MainActivity : ComponentActivity() {
             val im=getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
             im.showInputMethodPicker()
         }
-        Ui.add(root,Ui.label(this,"O teclado possui câmera, lote e ENTER. A ação no outro aplicativo depende do campo selecionado.",13f))
+        Ui.add(root,Ui.label(this,"O teclado mostra a câmera ao vivo à esquerda e os códigos à direita. Cada leitura tenta preencher o campo e enviar Enter. Salve Excel no botão do teclado.",13f))
         Ui.add(root,Ui.label(this,"CÓDIGOS DESTA LISTA",18f))
         items=Ui.column(this)
         Ui.add(root,items)
