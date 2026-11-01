@@ -15,6 +15,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.text.InputType
 import android.view.Gravity
+import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
@@ -42,6 +43,8 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -66,11 +69,15 @@ class TrackingImeService : InputMethodService() {
             Barcode.FORMAT_CODABAR
         ).build()
     )
+    private val textReader = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     private var provider: ProcessCameraProvider? = null
     private var camera: Camera? = null
     private var previewCase: Preview? = null
     private var analysisCase: ImageAnalysis? = null
     private var previewView: PreviewView? = null
+    private var zoomLabel: TextView? = null
+    private var lastOcrAt = 0L
+    private lateinit var pinch: ScaleGestureDetector
     private var status: TextView? = null
     private var history: LinearLayout? = null
     private var count: TextView? = null
@@ -125,6 +132,27 @@ class TrackingImeService : InputMethodService() {
             scaleType = PreviewView.ScaleType.FILL_CENTER
         }
         cameraBox.addView(previewView,FrameLayout.LayoutParams(-1,-1))
+        zoomLabel = label("1.0×  •  pinça para zoom",10f,Color.WHITE).apply {
+            setPadding(d(5),d(4),d(5),d(4))
+            setBackgroundColor(Color.argb(170,0,0,0))
+        }
+        cameraBox.addView(zoomLabel,FrameLayout.LayoutParams(-2,-2,Gravity.TOP or Gravity.START).apply {
+            leftMargin=d(4); topMargin=d(4)
+        })
+        pinch = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                val deviceCamera = camera ?: return false
+                val zoom = deviceCamera.cameraInfo.zoomState.value ?: return false
+                val newRatio = (zoom.zoomRatio * detector.scaleFactor).coerceIn(zoom.minZoomRatio, zoom.maxZoomRatio)
+                deviceCamera.cameraControl.setZoomRatio(newRatio)
+                zoomLabel?.text = String.format(java.util.Locale.US, "%.1f×  •  pinça",newRatio)
+                return true
+            }
+        })
+        previewView?.setOnTouchListener { _, event ->
+            pinch.onTouchEvent(event)
+            true
+        }
         val hint = label("Aponte a etiqueta para a câmera",10f,Color.WHITE).apply {
             gravity = Gravity.CENTER;setBackgroundColor(Color.argb(170,0,0,0))
         }
@@ -143,7 +171,7 @@ class TrackingImeService : InputMethodService() {
             marginEnd = d(6)
         })
         val right = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; background=card(Color.WHITE,12);setPadding(d(6),d(6),d(4),d(4)) }
-        right.addView(label("ÚLTIMOS CÓDIGOS",11f).apply {setTypeface(null,Typeface.BOLD)})
+        right.addView(label("CÓDIGO  |  NOME",11f).apply {setTypeface(null,Typeface.BOLD)})
         val scroll = ScrollView(this)
         history = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
         scroll.addView(history)
@@ -230,8 +258,9 @@ class TrackingImeService : InputMethodService() {
             container.addView(label("Ainda sem rastreios.",10f))
         } else {
             records.takeLast(6).asReversed().forEach { r ->
-                val l=label("✓ " + r.code + "\n" + r.kind,10f)
-                l.maxLines=2
+                val short = r.firstName.ifBlank { "Nome pendente" }
+                val l=label("✓ " + r.code + " | " + short,10f)
+                l.maxLines=3
                 l.setPadding(0,d(4),0,d(4))
                 container.addView(l)
             }
@@ -275,25 +304,66 @@ class TrackingImeService : InputMethodService() {
     }
 
     @OptIn(ExperimentalGetImage::class)
-    private fun detect(proxy:ImageProxy) {
-        if(!active || !enabled || !busy.compareAndSet(false,true)) {
-            proxy.close(); return
+    private fun detect(proxy: ImageProxy) {
+        if (!active || !enabled || !busy.compareAndSet(false,true)) {
+            proxy.close()
+            return
         }
         val media=proxy.image
         if(media==null) { busy.set(false);proxy.close();return }
         val input=InputImage.fromMediaImage(media,proxy.imageInfo.rotationDegrees)
-        mlkit.process(input)
-            .addOnSuccessListener { barcodes ->
-                if(!active || !enabled) return@addOnSuccessListener
-                val found=barcodes.firstNotNullOfOrNull { b ->
-                    b.rawValue?.let { raw ->
-                        TrackingParser.parse(raw,Store.strict(this))?.let { Pair(it,b.format) }
-                    }
-                }
-                if(found!=null) accept(found.first,found.second)
+        val finished=AtomicBoolean(false)
+        fun closeFrame() {
+            if(finished.compareAndSet(false,true)) {
+                proxy.close()
+                busy.set(false)
             }
-            .addOnFailureListener { setStatus("Falha na leitura. Ajuste iluminação e foco.") }
-            .addOnCompleteListener { proxy.close(); busy.set(false) }
+        }
+        try {
+            mlkit.process(input)
+                .addOnSuccessListener { barcodes ->
+                    val found=barcodes.firstNotNullOfOrNull { b ->
+                        b.rawValue?.let { raw ->
+                            TrackingParser.parse(raw,Store.strict(this))?.let { Pair(it,b.format) }
+                        }
+                    }
+                    if(!active || !enabled || found==null) {
+                        closeFrame()
+                        return@addOnSuccessListener
+                    }
+                    val (code,format)=found
+                    // Primeiro registra o rastreio e envia Enter sem depender do OCR.
+                    accept(code,format)
+                    val record=Store.list(this).find { it.code == code }
+                    val now=System.currentTimeMillis()
+                    val missing=record != null && (record.name.isBlank() || record.street.isBlank() ||
+                        record.district.isBlank() || record.zip.isBlank())
+                    if(!missing || now-lastOcrAt<850) {
+                        closeFrame()
+                        return@addOnSuccessListener
+                    }
+                    lastOcrAt=now
+                    // Usa a mesma imagem do código; evita vincular dados de outro pacote.
+                    textReader.process(input)
+                        .addOnSuccessListener { result ->
+                            if(active && enabled) {
+                                val info=RecipientOcr.parse(result.text)
+                                if(Store.updateRecipient(this,code,info)) {
+                                    render()
+                                    if(info.firstName.isNotBlank())
+                                        setStatus("Nome identificado: " + info.firstName + " • " + code)
+                                }
+                            }
+                        }
+                        .addOnCompleteListener { closeFrame() }
+                }
+                .addOnFailureListener {
+                    setStatus("Falha ao ler a etiqueta. Ajuste luz e foco.")
+                    closeFrame()
+                }
+        } catch(_:Exception) {
+            closeFrame()
+        }
     }
     private fun accept(code:String, format:Int) {
         if(!active || !enabled || clearPending) return
@@ -426,6 +496,7 @@ class TrackingImeService : InputMethodService() {
         owner.destroy()
         handler.removeCallbacksAndMessages(null)
         mlkit.close()
+        textReader.close()
         try { sound.release() } catch(_:Exception) {}
         worker.shutdown()
         super.onDestroy()
