@@ -22,8 +22,7 @@ object RecipientOcr {
     private val labelName = Regex("^(?:DESTINATARIO(?:\\s*\\(A\\))?|RECEBEDOR(?:A)?|NOME\\s+DO\\s+DESTINATARIO|NOME\\s+RECEBEDOR|NOME|ENTREGAR\\s+PARA|SHIP\\s+TO)\\s*[:#\\-]?\\s*(.*)$")
     private val labelStreet = Regex("^(?:ENDERECO(?:\\s+DE\\s+ENTREGA)?|LOGRADOURO|RUA|AVENIDA|AV|TRAVESSA|ESTRADA|PRACA|ALAMEDA)\\s*[:#\\-]?\\s*(.*)$")
     private val labelDistrict = Regex("^(?:BAIRRO|DISTRITO)\\s*[:#\\-]?\\s*(.*)$")
-    private val labelZip = Regex("(?:\\bCEP\\b\\s*[:#\\-]?\\s*)?(\\d{5}[\\s-]?\\d{3})(?!\\d)")
-    private val zipStandalone = Regex("(?<!\\d)(\\d{5}[\\s-]?\\d{3})(?!\\d)")
+    private val labelZip = Regex("\\bCEP\\b\\s*[:#\\-]?\\s*(\\d{5}[\\s-]?\\d{3})(?!\\d)")
     private val forbidden = Regex("\\b(?:DESTINATARIO|NOME|BAIRRO|CEP|ENDERECO|RUA|CODIGO|RASTREIO|REMETENTE|PEDIDO|SHOPEE|BR\\d{8,}|SPXBR\\d{8,})\\b")
 
     private fun plausibleName(v: String): Boolean {
@@ -48,7 +47,7 @@ object RecipientOcr {
         for((i,original) in lines.withIndex()) {
             val line=ascii(original)
             if(zip.isBlank()) {
-                val m=if(line.contains("CEP")) labelZip.find(line) else zipStandalone.find(line)
+                val m=if(line.contains("CEP")) labelZip.find(line) else null
                 if(m!=null) {
                     val digits=m.groupValues[1].filter(Char::isDigit)
                     if(digits.length == 8) zip=digits.take(5)+"-"+digits.takeLast(3)
@@ -67,7 +66,9 @@ object RecipientOcr {
                     val suffix=original.substring(original.length - m.groupValues[1].length)
                     val prefix=ascii(original).take(original.length-suffix.length).trim().trimEnd(':','-').trim()
                     // Evita confundir "RUA" solto com valor e preserva o tipo de logradouro.
-                    val value=takeValue(lines,i,suffix) { v -> v.length in 3..120 && !ascii(v).startsWith("BAIRRO") && !ascii(v).startsWith("CEP") }
+                    val value=takeValue(lines,i,suffix) { v -> v.length in 3..120 && v.any(Char::isLetter) &&
+                        !ascii(v).startsWith("BAIRRO") && !ascii(v).startsWith("CEP") &&
+                        !ascii(v).startsWith("BR") && !ascii(v).startsWith("SPXBR") }
                     if(value.isNotBlank()) street=if(prefix in setOf("RUA","AVENIDA","AV","TRAVESSA","ESTRADA","PRACA","ALAMEDA")) "$prefix $value" else value
                 }
             }
