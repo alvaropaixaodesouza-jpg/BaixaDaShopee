@@ -10,6 +10,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".ExportActivity" android:exported="false"/>
         <activity android:name=".ScanActivity" android:exported="false" android:screenOrientation="portrait"/>
         <service android:name=".TrackingImeService" android:exported="true"
             android:label="Teclado Rastreios BR" android:permission="android.permission.BIND_INPUT_METHOD">
