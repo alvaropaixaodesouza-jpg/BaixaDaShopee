@@ -61,6 +61,15 @@ object Store {
     }
     fun sessions(c: Context): List<String> =
         p(c).all.keys.filter { it.startsWith("rows_") }.map { it.removePrefix("rows_") }.sortedDescending()
+    @Synchronized fun removeLast(c: Context): Record? {
+        val id = active(c)
+        val rows = list(c, id)
+        if (rows.isEmpty()) return null
+        val data = JSONArray()
+        rows.dropLast(1).forEach { data.put(JSONObject().put("c",it.code).put("t",it.at).put("k",it.kind)) }
+        p(c).edit().putString("rows_" + id, data.toString()).commit()
+        return rows.last()
+    }
 }
 object QueueStore {
     private fun p(c: Context) = c.getSharedPreferences("rastreios_queue", Context.MODE_PRIVATE)
@@ -76,6 +85,11 @@ object QueueStore {
     @Synchronized fun pop(c: Context) {
         val a = JSONArray()
         list(c).drop(1).forEach { a.put(it) }
+        p(c).edit().putString("queue", a.toString()).commit()
+    }
+    @Synchronized fun remove(c: Context, code: String) {
+        val a = JSONArray()
+        list(c).filter { it != code }.forEach { a.put(it) }
         p(c).edit().putString("queue", a.toString()).commit()
     }
 }
