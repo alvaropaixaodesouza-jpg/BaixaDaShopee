@@ -61,6 +61,12 @@ object Store {
     }
     fun sessions(c: Context): List<String> =
         p(c).all.keys.filter { it.startsWith("rows_") }.map { it.removePrefix("rows_") }.sortedDescending()
+    @Synchronized fun clearActive(c: Context): Int {
+        val id = active(c)
+        val count = list(c, id).size
+        p(c).edit().putString("rows_" + id, "[]").commit()
+        return count
+    }
     @Synchronized fun removeLast(c: Context): Record? {
         val id = active(c)
         val rows = list(c, id)
@@ -86,6 +92,9 @@ object QueueStore {
         val a = JSONArray()
         list(c).drop(1).forEach { a.put(it) }
         p(c).edit().putString("queue", a.toString()).commit()
+    }
+    @Synchronized fun clear(c: Context) {
+        p(c).edit().putString("queue", "[]").commit()
     }
     @Synchronized fun remove(c: Context, code: String) {
         val a = JSONArray()
