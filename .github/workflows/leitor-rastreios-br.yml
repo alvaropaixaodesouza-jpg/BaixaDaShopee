@@ -1,0 +1,40 @@
+name: Leitor de Rastreios BR APK
+on:
+  push:
+    branches:
+      - feature/leitor-rastreios-br
+    paths:
+      - 'LeitorRastreiosBR/**'
+      - '.github/workflows/leitor-rastreios-br.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: LeitorRastreiosBR
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
+      - name: Preparar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Preparar Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Preparar Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Instalar SDK 35
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Compilar APK debug
+        run: gradle --no-daemon :app:assembleDebug --stacktrace
+      - name: Publicar APK para instalar
+        uses: actions/upload-artifact@v4
+        with:
+          name: LeitorRastreiosBR-debug
+          path: LeitorRastreiosBR/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
