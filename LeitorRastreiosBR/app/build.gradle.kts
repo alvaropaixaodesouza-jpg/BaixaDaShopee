@@ -23,4 +23,5 @@ dependencies {
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("androidx.lifecycle:lifecycle-runtime:2.8.7")
+    testImplementation("junit:junit:4.13.2")
 }
