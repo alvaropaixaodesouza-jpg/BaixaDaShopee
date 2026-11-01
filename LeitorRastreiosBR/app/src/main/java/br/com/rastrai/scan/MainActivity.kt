@@ -100,7 +100,7 @@ class MainActivity : ComponentActivity() {
         countLabel.text=rows.size.toString() + " pacotes"
         items.removeAllViews()
         rows.takeLast(80).asReversed().forEachIndexed { i,r ->
-            Ui.add(items,Ui.label(this,(rows.size-i).toString() + "  " + r.code,14f))
+            Ui.add(items,Ui.label(this,(rows.size-i).toString() + "  " + r.code + "  |  " + r.firstName.ifBlank { "Nome pendente" },14f))
         }
         if(rows.size>80) Ui.add(items,Ui.label(this,"Mostrando os últimos 80; o Excel terá todos.",12f))
     }
