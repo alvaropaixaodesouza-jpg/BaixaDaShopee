@@ -16,7 +16,13 @@ import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-data class Record(val code: String, val at: Long, val kind: String)
+data class Record(
+    val code: String, val at: Long, val kind: String,
+    val name: String = "", val street: String = "",
+    val district: String = "", val zip: String = ""
+) {
+    val firstName: String get() = name.trim().split(Regex("\\s+")).firstOrNull().orEmpty()
+}
 
 object TrackingParser {
     private val br = Regex("(?<![A-Z0-9])(?:SPX)?BR[A-Z0-9]{8,32}(?![A-Z0-9])")
@@ -47,7 +53,8 @@ object Store {
         val data = JSONArray(p(c).getString("rows_" + id, "[]") ?: "[]")
         return (0 until data.length()).map { i ->
             val x = data.getJSONObject(i)
-            Record(x.getString("c"), x.getLong("t"), x.optString("k", "QR/BARRAS"))
+            Record(x.getString("c"), x.getLong("t"), x.optString("k", "QR/BARRAS"),
+                x.optString("n",""), x.optString("s",""), x.optString("b",""), x.optString("z",""))
         }
     }
     @Synchronized fun add(c: Context, code: String, kind: String): Boolean {
@@ -58,6 +65,30 @@ object Store {
         a.put(JSONObject().put("c", code).put("t", System.currentTimeMillis()).put("k", kind))
         p(c).edit().putString("rows_" + id, a.toString()).commit()
         return true
+    }
+    private fun encode(r: Record) = JSONObject().put("c",r.code).put("t",r.at)
+        .put("k",r.kind).put("n",r.name).put("s",r.street)
+        .put("b",r.district).put("z",r.zip)
+    @Synchronized fun updateRecipient(c: Context, code: String, info: RecipientInfo): Boolean {
+        if(!info.hasAny) return false
+        val id = active(c)
+        val rows = list(c, id)
+        if(rows.none { it.code == code }) return false
+        var changed = false
+        val values = JSONArray()
+        for(r in rows) {
+            if(r.code != code) { values.put(encode(r)); continue }
+            val updated = r.copy(
+                name = r.name.ifBlank { info.name },
+                street = r.street.ifBlank { info.street },
+                district = r.district.ifBlank { info.district },
+                zip = r.zip.ifBlank { info.zip }
+            )
+            if(updated != r) changed = true
+            values.put(encode(updated))
+        }
+        if(changed) p(c).edit().putString("rows_" + id, values.toString()).commit()
+        return changed
     }
     fun sessions(c: Context): List<String> =
         p(c).all.keys.filter { it.startsWith("rows_") }.map { it.removePrefix("rows_") }.sortedDescending()
@@ -72,7 +103,7 @@ object Store {
         val rows = list(c, id)
         if (rows.isEmpty()) return null
         val data = JSONArray()
-        rows.dropLast(1).forEach { data.put(JSONObject().put("c",it.code).put("t",it.at).put("k",it.kind)) }
+        rows.dropLast(1).forEach { data.put(encode(it)) }
         p(c).edit().putString("rows_" + id, data.toString()).commit()
         return rows.last()
     }
@@ -134,7 +165,7 @@ object Excel {
                 "<c r=\"" + pos + "\" t=\"inlineStr\"><is><t>" + esc(value) + "</t></is></c>"
             val sheetRows = buildString {
                 append("<row r=\"1\">")
-                listOf("Nº", "Código de rastreio", "Data e hora", "Tipo").forEachIndexed { i,v ->
+                listOf("Nº", "Código de rastreio", "Data e hora", "Tipo", "Destinatário", "Primeiro nome", "Rua / Endereço", "Bairro", "CEP").forEachIndexed { i,v ->
                     append(cell(('A' + i).toString() + "1",v))
                 }
                 append("</row>")
@@ -146,6 +177,11 @@ object Excel {
                     append(cell("B" + n,r.code))
                     append(cell("C" + n,fmt.format(Date(r.at))))
                     append(cell("D" + n,r.kind))
+                    append(cell("E" + n,r.name))
+                    append(cell("F" + n,r.firstName))
+                    append(cell("G" + n,r.street))
+                    append(cell("H" + n,r.district))
+                    append(cell("I" + n,r.zip))
                     append("</row>")
                 }
             }
