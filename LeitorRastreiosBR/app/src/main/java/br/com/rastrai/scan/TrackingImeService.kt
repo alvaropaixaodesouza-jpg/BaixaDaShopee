@@ -75,6 +75,10 @@ class TrackingImeService : InputMethodService() {
     private var history: LinearLayout? = null
     private var count: TextView? = null
     private var toggle: Button? = null
+    private var clearButton: Button? = null
+    private var feedback: TextView? = null
+    private var clearPending = false
+    private var blockScansUntil = 0L
     private var active = false
     private var enabled = true
     private var sending = false
@@ -82,7 +86,7 @@ class TrackingImeService : InputMethodService() {
     private var lastCandidate = ""
     private var lastCandidateAt = 0L
     private var lastScannedAt = 0L
-    private val sound by lazy { ToneGenerator(AudioManager.STREAM_NOTIFICATION, 65) }
+    private val sound by lazy { ToneGenerator(AudioManager.STREAM_MUSIC, 95) }
 
     private fun d(n: Int) = (resources.displayMetrics.density * n).toInt()
     private val bg = Color.rgb(230,236,245)
@@ -125,6 +129,16 @@ class TrackingImeService : InputMethodService() {
             gravity = Gravity.CENTER;setBackgroundColor(Color.argb(170,0,0,0))
         }
         cameraBox.addView(hint,FrameLayout.LayoutParams(-1,d(28),Gravity.BOTTOM))
+        feedback = label("", 13f, Color.WHITE).apply {
+            gravity = Gravity.CENTER
+            setTypeface(null, Typeface.BOLD)
+            setPadding(d(5),d(7),d(5),d(7))
+            background = card(Color.rgb(9,128,69),9)
+            visibility = View.GONE
+        }
+        cameraBox.addView(feedback,FrameLayout.LayoutParams(-1,-2,Gravity.CENTER).apply {
+            leftMargin = d(10); rightMargin = d(10)
+        })
         main.addView(cameraBox,LinearLayout.LayoutParams(0,d(205),1.25f).apply {
             marginEnd = d(6)
         })
@@ -144,6 +158,7 @@ class TrackingImeService : InputMethodService() {
             val b=button(text,click)
             actions.addView(b,LinearLayout.LayoutParams(0,d(49),weight).apply { marginEnd = d(4) })
             if(text == "QR / BARRAS") toggle=b
+            if(text == "LIMPAR LISTA") clearButton=b
         }
         action("QR / BARRAS",1.1f) {
             enabled = !enabled
@@ -153,7 +168,7 @@ class TrackingImeService : InputMethodService() {
                 if(!active) startCamera()
             } else setStatus("Leitura pausada • câmera visível")
         }
-        action("ENVIAR LOTE",1f) { sendQueue() }
+        action("LIMPAR LISTA",1f) { confirmClear() }
         action("APAGAR",0.75f) { deleteLast() }
         root.addView(actions)
         val save = button("SALVAR PLANILHA EXCEL  •  ESCOLHER MEMÓRIA / CARTÃO SD") { exportExcel() }
@@ -196,6 +211,16 @@ class TrackingImeService : InputMethodService() {
     }
 
     private fun setStatus(text:String) { status?.text=text }
+    private fun showScanFeedback(code: String, kind: String) {
+        feedback?.text = "✓ BIPADO: " + kind + "\n" + code
+        feedback?.visibility = View.VISIBLE
+        status?.setTextColor(Color.rgb(9,128,69))
+        setStatus("✓ Escaneado e salvo: " + code)
+        handler.postDelayed({
+            if(feedback?.text?.contains(code) == true) feedback?.visibility=View.GONE
+            status?.setTextColor(ink)
+        },1700)
+    }
     private fun render() {
         val records=Store.list(this)
         count?.text = records.size.toString()+" salvos"
@@ -205,7 +230,7 @@ class TrackingImeService : InputMethodService() {
             container.addView(label("Ainda sem rastreios.",10f))
         } else {
             records.takeLast(6).asReversed().forEach { r ->
-                val l=label(r.code,10f)
+                val l=label("✓ " + r.code + "\n" + r.kind,10f)
                 l.maxLines=2
                 l.setPadding(0,d(4),0,d(4))
                 container.addView(l)
@@ -271,8 +296,9 @@ class TrackingImeService : InputMethodService() {
             .addOnCompleteListener { proxy.close(); busy.set(false) }
     }
     private fun accept(code:String, format:Int) {
-        if(!active || !enabled) return
+        if(!active || !enabled || clearPending) return
         val now=System.currentTimeMillis()
+        if(now < blockScansUntil) return
         if(code!=lastCandidate || now-lastCandidateAt>1500) {
             lastCandidate=code;lastCandidateAt=now;return
         }
@@ -285,11 +311,12 @@ class TrackingImeService : InputMethodService() {
         }
         QueueStore.append(this,listOf(code))
         try {
-            sound.startTone(ToneGenerator.TONE_PROP_BEEP,100)
+            sound.stopTone()
+            sound.startTone(ToneGenerator.TONE_PROP_BEEP,180)
             (getSystemService(VIBRATOR_SERVICE) as Vibrator).vibrate(
                 VibrationEffect.createOneShot(55,VibrationEffect.DEFAULT_AMPLITUDE))
         } catch(_:Exception) {}
-        setStatus("Registrado: " + code)
+        showScanFeedback(code,type)
         render()
         sendQueue()
     }
@@ -313,7 +340,7 @@ class TrackingImeService : InputMethodService() {
         sending=true
         val committed=try { connection.commitText(first,1) } catch(_:Exception) { false }
         if(!committed) {
-            sending=false;setStatus("Falha ao preencher campo • use ENVIAR LOTE");return
+            sending=false;setStatus("Falha ao preencher campo • selecione o campo novamente");return
         }
         setStatus("Inserido: "+first+" • Enter automático...")
         handler.postDelayed({
@@ -334,13 +361,57 @@ class TrackingImeService : InputMethodService() {
             }
         },650)
     }
+    private fun confirmClear() {
+        if(sending) { setStatus("Conclua o envio atual antes de limpar a lista"); return }
+        val amount=Store.list(this).size
+        if(amount == 0) {
+            clearPending=false
+            clearButton?.text="LIMPAR LISTA"
+            setStatus("A lista já está vazia")
+            return
+        }
+        if(!clearPending) {
+            clearPending=true
+            clearButton?.text="CONFIRMAR"
+            clearButton?.background=card(Color.rgb(255,222,215),10)
+            setStatus("Toque CONFIRMAR para apagar TODOS os " + amount + " rastreios desta lista")
+            handler.postDelayed({
+                if(clearPending) {
+                    clearPending=false
+                    clearButton?.text="LIMPAR LISTA"
+                    clearButton?.background=card(Color.WHITE,10)
+                    setStatus("Limpeza cancelada. Códigos preservados.")
+                }
+            },6000)
+            return
+        }
+        clearPending=false
+        clearButton?.text="LIMPAR LISTA"
+        clearButton?.background=card(Color.WHITE,10)
+        val cleared=Store.clearActive(this)
+        QueueStore.clear(this)
+        feedback?.visibility=View.GONE
+        lastCandidate=""
+        lastScannedAt=System.currentTimeMillis()
+        blockScansUntil=System.currentTimeMillis()+2500L
+        render()
+        setStatus("Lista limpa: " + cleared + " pacotes removidos. Retire o pacote anterior.")
+    }
     private fun deleteLast() {
         if(sending) { setStatus("Conclua o envio atual antes de apagar");return }
+        if(clearPending) {
+            clearPending=false
+            clearButton?.text="LIMPAR LISTA"
+            clearButton?.background=card(Color.WHITE,10)
+        }
         val removed=Store.removeLast(this)
         if(removed!=null) {
             QueueStore.remove(this,removed.code)
+            blockScansUntil=System.currentTimeMillis()+1600L
+            feedback?.visibility=View.GONE
+            lastCandidate=""
             render()
-            setStatus("Removido da lista: "+removed.code+" (não desfaz no outro app)")
+            setStatus("Último pacote apagado: "+removed.code+" (não desfaz no outro app)")
         } else setStatus("Lista vazia")
     }
     private fun exportExcel() {
@@ -355,6 +426,7 @@ class TrackingImeService : InputMethodService() {
         owner.destroy()
         handler.removeCallbacksAndMessages(null)
         mlkit.close()
+        try { sound.release() } catch(_:Exception) {}
         worker.shutdown()
         super.onDestroy()
     }
