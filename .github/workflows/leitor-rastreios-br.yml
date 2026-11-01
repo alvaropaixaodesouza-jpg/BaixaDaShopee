@@ -1,8 +1,8 @@
-name: Leitor Rastreios BR APK v1.2 (Bip e Limpar)
+name: Leitor Rastreios BR APK v1.3 (Zoom e OCR)
 on:
   push:
     branches:
-      - feature/limpar-lista-bip-teclado
+      - feature/v1-3-zoom-ocr-etiqueta
     paths:
       - 'LeitorRastreiosBR/**'
       - '.github/workflows/leitor-rastreios-br.yml'
