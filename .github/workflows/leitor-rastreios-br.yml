@@ -1,8 +1,8 @@
-name: Leitor de Rastreios BR APK
+name: Leitor de Rastreios BR APK (Câmera no Teclado)
 on:
   push:
     branches:
-      - feature/leitor-rastreios-br
+      - feature/camera-dentro-teclado
     paths:
       - 'LeitorRastreiosBR/**'
       - '.github/workflows/leitor-rastreios-br.yml'
