@@ -1,22 +1,26 @@
-# Leitor de Rastreios BR v1.6 — Correções após vídeo de uso real
+# Leitor de Rastreios BR v1.7 — Quebra de linha corrigida
 
-## Correções aplicadas
-1. **Backspace no teclado**: se houver seleção de texto, substitui a seleção inteira por vazio com `InputConnection.commitText("", 1)`. Sem seleção, remove um caractere anterior ao cursor. Não interfere no botão inferior **APAGAR**, que remove o último pacote escaneado da lista da câmera.
-2. **Botão Excel duplicado removido**: a aba ROTA fica com **IMPORTAR EXCEL** e **LIMPAR LISTA**. Pode importar outros arquivos repetindo o mesmo botão Importar Excel e alternar entre rotas existentes em Selecionar Rota.
-3. **Limpar lista da rota**: ao tocar LIMPAR LISTA duas vezes em até oito segundos, remove apenas o arquivo/rota selecionada, apagando seus BRs e progresso. Outras rotas importadas e a lista de pacotes escaneados na aba da câmera permanecem preservadas.
-4. **Cancelar duas vezes**: primeiro toque interrompe o envio e guarda o progresso; segundo toque em até oito segundos **reinicia o índice da rota para 0**, de modo que o próximo INICIAR começa no primeiro BR novamente. Não dispara envio automaticamente após reiniciar.
-5. **Continuidade ao esconder e reabrir o teclado**: após o primeiro INICIAR o estado da execução fica registrado. Se o aplicativo receptor ocultar temporariamente o teclado após Enter, ele entra em estado **Aguardando campo**. Quando o mesmo aplicativo e campo compatível reaparecem dentro de três minutos, o teclado tenta retomar sozinho, respeitando o intervalo configurado contado do último Enter. O progresso de envio e o alvo são preservados mesmo se o serviço do teclado for recriado.
-6. **Proteção de campo**: não reenvia se retornar em outro aplicativo, campo de senha/URL, campo incompatível ou campo com texto não selecionado que poderia concatenar BRs. Nesses casos pede intervenção manual.
+**Correção após análise do vídeo de 51,7 s:** o teclado Android simulava a tecla Enter com `InputConnection.sendKeyEvent(KEYCODE_ENTER)`. O aplicativo de destino pode interceptar essa tecla, interpretá-la como ação ou não inserir `\n`. Depois da primeira tentativa, a regra antiga `safeToType()` recusava qualquer campo com texto, fazendo o reenvio parar em 1/9.
 
-## Reenvio
-Abra o campo do aplicativo de destino, selecione o teclado Rastreios BR, toque → ROTA. Importe Excel `.xlsx`, CSV ou texto com códigos BR. Ajuste o intervalo com +/− (padrão 3 s). Toque INICIAR. O sistema envia BR, tecla Enter, aguarda o intervalo configurado e envia o próximo quando o mesmo campo estiver disponível. PAUSAR interrompe imediatamente e exige INICIAR para voltar. CANCELAR duas vezes reinicia a rota.
+A aba ROTA agora tem um botão de **MODO: QUEBRA DE LINHA ↵** (padrão), que pode ser alternado para **MODO: ENTER DO APLICATIVO**. A preferência é salva.
 
-A lista mostra quantos **códigos tiveram Enter enviado pelo teclado**; isso **não comprova que a baixa foi aceita no sistema de destino**. A automação só pode operar com o campo de texto ativo, não controla o navegador ou a tela por fora dele. Se for necessário alternar outras telas, a automação pode ser bloqueada por segurança.
+### Modo QUEBRA DE LINHA — para testar em campos de mensagem e editores de texto
+- Para cada BR: `commitText(codigo, 1)`, `commitText("\n", 1)`, verifica se o campo terminou com `codigo + "\n"` e aguarda o intervalo configurado.
+- O próximo BR é permitido quando o cursor está no fim de uma linha vazia, mesmo que as linhas anteriores tenham outros BRs. Não precisa apagar a primeira linha.
+- Se o campo bloquear a quebra de linha ou o cursor estiver no meio do texto, pausa em vez de repetir códigos.
+- **Não envia a mensagem do WhatsApp**, apenas compõe um texto com um BR por linha; o usuário decide se deve enviar depois.
 
-## Exportação/Importação
-O Excel do aplicativo contém apenas uma coluna "Código BR". O importador identifica BRs mesmo em planilhas antigas com outras informações, porém armazena só os códigos no sistema de rotas. Mantém a ordem, remove duplicatas dentro da mesma rota e suporta até 10 mil códigos e 12 MB por arquivo. O Android pode abrir seu seletor padrão por um instante durante a importação. Não usamos servidores externos.
+### Modo ENTER DO APLICATIVO — para sistemas de baixas
+- Insere o BR e dispara `KEYCODE_ENTER`. A ação que o campo realiza depende do aplicativo receptor.
+- Só passa para o próximo quando o campo estiver livre de texto ou o texto anterior estiver selecionado; evita concatenar códigos acidentalmente.
+- O contador indica eventos enviados, **não confirma baixa no sistema**.
 
-## Compilar
-O fluxo GitHub Actions na branch `feature/v1-6-continuidade-teclado` executa testes e compila o APK debug. Baixe o artefato `LeitorRastreiosBR-debug` na execução concluída.
+O teclado ainda oferece **Importar Excel, Limpar Lista, Selecionar Rota, Iniciar, Pausar, Cancelar duas vezes para reiniciar do primeiro BR e tempo ajustável**. A câmera permanece na primeira aba. A preferência de aba e o progresso da rota são preservados após recriação do teclado. Os arquivos XLSX e CSV são interpretados localmente, importando apenas códigos BR.
 
-**Aviso de atualização:** exporte as listas antes de desinstalar versões antigas; desinstalar pode apagar registros locais. A funcionalidade foi compilada e precisa de teste real no navegador/app receptor, pois o teclado Android não consegue garantir que cada Enter tenha sido processado.
+### Testes
+GitHub Actions compila o APK debug e roda testes JUnit, incluindo casos de campo com linhas existentes, nova linha não inserida, seleção de texto e cursor no meio do campo.
+
+### Limitações
+Nem todo campo Android aceita quebras de linha. Um campo configurado para apenas uma linha ou para envio imediato pode rejeitar `\n`; a ferramenta deve pausar e avisar. Para baixas reais, teste com poucos códigos antes de usar em produção. Não é possível garantir que o aplicativo receptor processou a baixa a partir do sucesso do Enter no teclado.
+
+**Instalação:** antes de desinstalar, exporte suas listas. APK debug assinado por outra chave pode exigir remoção da versão anterior e perder os dados locais. Preferir o link de artefatos do GitHub se o anexo do ChatGPT falhar.
