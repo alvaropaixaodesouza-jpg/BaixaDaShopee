@@ -37,7 +37,7 @@ class MainActivity : ComponentActivity() {
         scroll.addView(root)
         setContentView(scroll)
         Ui.add(root, Ui.label(this,"LEITOR DE RASTREIOS BR",24f))
-        Ui.add(root, Ui.label(this,"QR Code + barras • leitura contínua • sem internet",13f))
+        Ui.add(root, Ui.label(this,"QR Code + barras • somente BR • sem internet",13f))
         countLabel = Ui.label(this,"0 pacotes",29f)
         Ui.add(root,countLabel)
         listLabel = Ui.label(this,"",12f)
@@ -70,12 +70,6 @@ class MainActivity : ComponentActivity() {
                     Store.select(this,ids[index]); refresh()
                 }.setNegativeButton("Fechar",null).show()
         }
-        val strict=CheckBox(this).apply {
-            text="Somente BR / SPXBR (recomendado)"
-            isChecked=Store.strict(this@MainActivity)
-            setOnCheckedChangeListener { _,checked -> Store.setStrict(this@MainActivity,checked) }
-        }
-        Ui.add(root,strict)
         Ui.add(root,Ui.label(this,"TECLADO PARA OUTROS APLICATIVOS",18f))
         val enable=Ui.button(this,"1. Ativar teclado de rastreios no Android")
         Ui.add(root,enable)
@@ -86,7 +80,7 @@ class MainActivity : ComponentActivity() {
             val im=getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
             im.showInputMethodPicker()
         }
-        Ui.add(root,Ui.label(this,"O teclado mostra a câmera ao vivo à esquerda e os códigos à direita. Cada leitura tenta preencher o campo e enviar Enter. Salve Excel no botão do teclado.",13f))
+        Ui.add(root,Ui.label(this,"A câmera lê somente BR e mostra os códigos à direita. Na aba ROTA importe Excel e use Iniciar para enviar BR + Enter com intervalo ajustável.",13f))
         Ui.add(root,Ui.label(this,"CÓDIGOS DESTA LISTA",18f))
         items=Ui.column(this)
         Ui.add(root,items)
@@ -100,7 +94,7 @@ class MainActivity : ComponentActivity() {
         countLabel.text=rows.size.toString() + " pacotes"
         items.removeAllViews()
         rows.takeLast(80).asReversed().forEachIndexed { i,r ->
-            Ui.add(items,Ui.label(this,(rows.size-i).toString() + "  " + r.code + "  |  " + r.firstName.ifBlank { "Nome pendente" },14f))
+            Ui.add(items,Ui.label(this,(rows.size-i).toString() + "  " + r.code,14f))
         }
         if(rows.size>80) Ui.add(items,Ui.label(this,"Mostrando os últimos 80; o Excel terá todos.",12f))
     }
