@@ -34,6 +34,7 @@ class ReplayPanel(
     private val red=Color.rgb(164,30,30)
     private lateinit var routeButton: Button
     private lateinit var clearButton: Button
+    private lateinit var modeButton: Button
     private lateinit var cancelButton: Button
     private lateinit var seconds: TextView
     private lateinit var progressText: TextView
@@ -107,6 +108,16 @@ class ReplayPanel(
         interval.addView(button("+") { ReplayRoutes.adjustInterval(service,1);refresh() },
             LinearLayout.LayoutParams(dp(43),dp(43)))
         put(view,interval,44)
+        modeButton=button("MODO: NOVA LINHA ↵") {
+            if(running || awaitingFocus) manualPause("Pausado para alterar modo de envio")
+            val prefs=service.getSharedPreferences("replay_typing",0)
+            prefs.edit().putBoolean("newline",!newlineMode()).apply()
+            refresh()
+        }.apply {
+            background=background(Color.rgb(216,230,253))
+            setTextColor(blue)
+        }
+        put(view,modeButton,35)
 
         progressText=text("Nenhuma rota",13f)
         put(view,progressText,27)
@@ -136,7 +147,7 @@ class ReplayPanel(
         action("Ⅱ PAUSAR",blue) { manualPause("Pausado pelo usuário") }
         cancelButton=action("✕ CANCELAR",red) { cancelOrReset() }
         put(view,actions,53)
-        put(view,text("Enter enviado ≠ baixa confirmada. Continuação somente no mesmo campo.",10f),29)
+        put(view,text("Nova linha: vários BRs no texto. Enter app: ação do campo, sem confirmar baixa.",10f),29)
 
         restoreContinuation()
         refresh()
@@ -157,6 +168,9 @@ class ReplayPanel(
         awaitingFocus=true
         ReplayRoutes.saveRunState(service,"Aguardando retorno ao campo para continuar")
     }
+    private fun newlineMode():Boolean =
+        service.getSharedPreferences("replay_typing",0).getBoolean("newline",true)
+
     private fun launchImport() {
         manualPause("Pausado para importar arquivo")
         service.startActivity(Intent(service,RouteImportActivity::class.java)
@@ -182,7 +196,9 @@ class ReplayPanel(
         val route=ReplayRoutes.active(service)
         routeButton.text=route?.let { "ROTA: "+it.title+" ▾" } ?: "SELECIONAR ROTA ▾"
         seconds.text=String.format(Locale("pt","BR"),"%.1f s",ReplayRoutes.intervalMillis(service)/1000.0)
-        progressText.text=route?.let { it.nextIndex.toString()+" / "+it.codes.size+" códigos com Enter enviado" }
+        modeButton.text=if(newlineMode()) "MODO: QUEBRA DE LINHA ↵" else "MODO: ENTER DO APLICATIVO"
+        progressText.text=route?.let { it.nextIndex.toString()+" / "+it.codes.size+
+            if(newlineMode()) " BRs inseridos em linhas" else " Enter(s) enviados" }
             ?: "Nenhuma rota importada"
         progress.progress=route?.let { if(it.codes.isEmpty()) 0 else it.nextIndex*1000/it.codes.size } ?: 0
         currentCode.text=route?.let {
@@ -226,10 +242,9 @@ class ReplayPanel(
     private fun safeToType():Boolean {
         val ic=service.currentInputConnection ?: return false
         val selected=runCatching { ic.getSelectedText(0)?.toString().orEmpty() }.getOrDefault("")
-        if(selected.isNotEmpty()) return true
         val before=runCatching { ic.getTextBeforeCursor(128,0)?.toString().orEmpty() }.getOrDefault("")
         val after=runCatching { ic.getTextAfterCursor(128,0)?.toString().orEmpty() }.getOrDefault("")
-        return before.isBlank() && after.isBlank()
+        return ReplayTypingPolicy.canType(before,after,selected,newlineMode())
     }
     fun onInputReady() {
         refresh()
@@ -258,7 +273,8 @@ class ReplayPanel(
             return
         }
         if(!safeToType()) {
-            manualPause("O campo contém texto não selecionado. Revise para não concatenar BRs.")
+            manualPause(if(newlineMode()) "Não há quebra de linha no final do campo. Revise antes de continuar."
+                else "Campo não está vazio. Revise antes de continuar.")
             return
         }
         awaitingFocus=false
@@ -309,7 +325,9 @@ class ReplayPanel(
             state.text="Não enviar rastreios à barra de endereço do navegador";return
         }
         if(!safeToType()) {
-            state.text="Selecione o texto do campo ou limpe antes de iniciar";return
+            state.text=if(newlineMode()) "Limpe o campo ou deixe o cursor no início de uma linha vazia"
+                else "Selecione o texto do campo ou limpe antes de iniciar"
+            return
         }
         cancelConfirmUntil=0
         cancelButton.text="✕ CANCELAR"
@@ -339,7 +357,8 @@ class ReplayPanel(
             return
         }
         if(!safeToType()) {
-            manualPause("Campo não está vazio. Corrija antes de continuar.");return
+            manualPause(if(newlineMode()) "A última linha não terminou com Enter. Corrija antes de continuar."
+                else "Campo não está vazio. Corrija antes de continuar.");return
         }
         val connection=service.currentInputConnection ?: run { onHidden();return }
         val index=route.nextIndex
@@ -348,27 +367,49 @@ class ReplayPanel(
         if(!inserted) {
             manualPause("Falha ao digitar "+code);return
         }
-        // Enter enviado imediatamente após cada BR. Se não for aceito, não continuar sozinho.
-        val entered=try {
-            val down=connection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_ENTER))
-            val up=connection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_ENTER))
-            if(down && up) true
-            else connection.performEditorAction(EditorInfo.IME_ACTION_DONE)
-        } catch(_:Exception) { false }
-        if(!entered) {
-            manualPause("BR digitado, mas Enter incerto. Revise o destino antes de reiniciar.")
-            return
+        if(newlineMode()) {
+            // Newline é TEXTO, não uma ação de enviar formulário:
+            // KEYCODE_ENTER pode ser interpretado como "enviar" ou ser consumido.
+            val newlineWritten=try { connection.commitText("\n",1) } catch(_:Exception) { false }
+            if(!newlineWritten) {
+                manualPause("BR digitado, mas o campo recusou a nova linha. Verifique o texto.")
+                return
+            }
+            // Alguns aplicativos atualizam o editor de forma assíncrona; verifique após 120ms.
+            handler.postDelayed({
+                if(!running || generation!=version) return@postDelayed
+                val tail=runCatching { connection.getTextBeforeCursor(code.length+2,0)?.toString() }
+                    .getOrNull()
+                if(!ReplayTypingPolicy.newlineWasInserted(tail,code)) {
+                    manualPause("A quebra de linha não foi confirmada. Corrija antes de reenviar.")
+                    return@postDelayed
+                }
+                completeOne(route.id,index,code,version,"Nova linha inserida")
+            },120)
+        } else {
+            // ENTER de teclado real para app de baixas que interpreta Enter como ação.
+            val entered=try {
+                val down=connection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_ENTER))
+                val up=connection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_ENTER))
+                down && up
+            } catch(_:Exception) { false }
+            if(!entered) {
+                manualPause("BR digitado, mas Enter não foi aceito. Revise antes de reiniciar.")
+                return
+            }
+            completeOne(route.id,index,code,version,"Enter enviado")
         }
-        if(!ReplayRoutes.advance(service,route.id,index)) {
-            manualPause("Progresso não foi salvo. Reenvio interrompido por segurança.")
+    }
+    private fun completeOne(routeId:String,index:Int,code:String,version:Int,label:String) {
+        if(!ReplayRoutes.advance(service,routeId,index)) {
+            manualPause("Progresso não foi salvo. Revise o último BR para evitar duplicação.")
             return
         }
         lastEnterAt=System.currentTimeMillis()
-        ReplayRoutes.updateLastEnter(service,route.id,lastEnterAt)
+        ReplayRoutes.updateLastEnter(service,routeId,lastEnterAt)
         refresh()
-        state.text="Enviado: "+code+" • próximo em "+String.format(Locale("pt","BR"),
+        state.text=label+": "+code+" • próximo em "+String.format(Locale("pt","BR"),
             "%.1f",ReplayRoutes.intervalMillis(service)/1000.0)+" s"
-        // Se o Enter ocultar o teclado, onHidden invalida esta chamada.
         if(running && version==generation) {
             handler.postDelayed({ sendNext(version) },ReplayRoutes.intervalMillis(service).toLong())
         }
