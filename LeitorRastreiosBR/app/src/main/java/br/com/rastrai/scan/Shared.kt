@@ -27,6 +27,8 @@ data class Record(
 object TrackingParser {
     private val br = Regex("(?<![A-Z0-9])BR[A-Z0-9]{8,32}(?![A-Z0-9])")
     private val generic = Regex("^[A-Z0-9][A-Z0-9_-]{5,59}$")
+    fun extractAll(raw: String): List<String> =
+        br.findAll(raw.uppercase(Locale.ROOT)).map { it.value }.toList()
     fun parse(raw: String, strict: Boolean): String? {
         val normalized = raw.uppercase(Locale.ROOT).trim()
         br.find(normalized)?.let { return it.value }
