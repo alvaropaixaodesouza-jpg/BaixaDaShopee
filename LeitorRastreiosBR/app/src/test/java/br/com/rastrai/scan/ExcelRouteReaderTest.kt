@@ -72,6 +72,13 @@ BR262241282602R BR264960487237O"""
             assertTrue(e.message.orEmpty().contains("XML"))
         }
     }
+    @Test fun ignoraNomesQueComecamComAsLetrasBR() {
+        val text="Nome;Rastreio\nBrunoMedeiros;BR261087203125T\nBrunaOliveira;BR2634199134265"
+        val codes=ExcelRouteReader.read(ByteArrayInputStream(text.toByteArray()))
+        assertEquals(listOf("BR261087203125T","BR2634199134265"),codes)
+        assertNull(TrackingParser.parse("BRUNOMEDEIROS", true))
+    }
+
     @Test(expected=IllegalArgumentException::class)
     fun semBRNaoImporta() {
         ExcelRouteReader.read(ByteArrayInputStream("Nome;Rua\nAna;Centro".toByteArray()))
