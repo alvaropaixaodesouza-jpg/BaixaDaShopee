@@ -1,8 +1,8 @@
-name: Leitor Rastreios BR APK v1.3 (Zoom e OCR)
+name: Leitor Rastreios BR APK v1.4 (Reenvio Excel)
 on:
   push:
     branches:
-      - feature/v1-3-zoom-ocr-etiqueta
+      - feature/v1-4-reenvio-excel
     paths:
       - 'LeitorRastreiosBR/**'
       - '.github/workflows/leitor-rastreios-br.yml'
