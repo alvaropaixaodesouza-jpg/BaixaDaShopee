@@ -1,15 +1,28 @@
-# Leitor de Rastreios BR v1.4 — Importar rotas Excel e reenviar
+# Leitor de Rastreios BR v1.5 — Excel corrigido, somente rastreios
 
-Aba **CÂMERA** (primeira): scanner QR/barras, zoom, OCR de nome, histórico, bip, limpar lista, apagar último e exportar Excel. Nenhum botão inferior mudou. Foram adicionados os atalhos do campo de texto: **Backspace** e **Enter**, e seta **→ ROTA**.
+## O que mudou
+- Corrigido o erro **"This parser does not support specification Unknown version 0.0"** na importação de Excel no Android: a versão anterior chamava `DocumentBuilderFactory.isXIncludeAware=false`, não suportado em certas versões do Android.
+- Lê planilhas **.xlsx**, arquivos **.csv** e listas **.txt** com códigos BR. Aceita `inlineStr` (Excel exportado pelo próprio aplicativo), `sharedStrings` (planilhas feitas em Excel/LibreOffice) e arquivos de texto com um BR por linha.
+- Ignora nomes, endereços, CEP, números de pedido e outras colunas. **Somente códigos que começam com BR** entram na rota. Códigos repetidos são descartados mantendo a ordem do primeiro registro.
+- A exportação de Excel agora tem **uma coluna "Código BR"** e uma linha por rastreio. Não coleta nem exporta nomes. O scanner QR/BARRAS continua dentro do teclado, com bip e zoom.
+- A segunda aba mostra a lista importada e o próximo BR a enviar. A navegação por setas entre câmera/rota permanece.
 
-Aba **ROTA** (segunda): seta **← VOLTAR**; **IMPORTAR EXCEL** abre o seletor nativo de arquivos; **+ NOVO EXCEL** adiciona outra rota independente sem apagar as anteriores; **SELECIONAR ROTA** permite trocar entre arquivos importados. São aceitos **.xlsx** (primeira planilha) e CSV. O importador local lê códigos **BR/SPXBR**, elimina duplicatas dentro da rota e limita 10.000 códigos e 12 MB por arquivo. Os dados da rota não são enviados para nenhum servidor.
+## Como usar no WhatsApp ou em aplicativo de baixas
+1. Abra o campo onde os códigos devem ser digitados e selecione o teclado Rastreios BR.
+2. Toque **→ ROTA** e depois **IMPORTAR EXCEL** (ou **+ NOVO EXCEL** para adicionar outra rota sem apagar as anteriores).
+3. Escolha a planilha do celular. O Android volta ao teclado; se preciso, toque no campo novamente.
+4. Veja a quantidade e os BRs encontrados. Ajuste o intervalo pelo **−** ou **+** (padrão 3,0 segundos, 0,5 a 60 segundos).
+5. Toque **INICIAR**. O teclado insere um BR, envia Enter e espera o intervalo escolhido antes do próximo.
+6. **PAUSAR** interrompe, **CANCELAR** para e guarda o progresso. O envio não volta sozinho ao fechar o teclado.
 
-**Intervalo entre o Enter e o próximo código:** botões **−** e **+**, em passos de 0,5 segundo, de 0,5 até 60 segundos. Inicialmente 3,0 s. O intervalo pode ser ajustado enquanto roda.
+## Restrições importantes
+- **Enter enviado não significa baixa concluída**: o aplicativo de destino pode processar Enter de maneira diferente ou perder o foco. Se o campo fechar ou mudar de aplicativo, a execução pausa.
+- Não utiliza Accessibility Service para abrir ou controlar outras telas. Precisa manter o campo de texto selecionado.
+- Limite de 10 mil BRs por arquivo e 12 MB de entrada. **.xls** antigo não é suportado; salve como `.xlsx`.
+- Planilhas importadas, códigos e progresso ficam localmente no aparelho. Não existe upload para servidores.
+- Antes de desinstalar versões anteriores, exporte seus dados. APK debug pode ter assinatura diferente.
 
-**INICIAR** envia um código por vez no campo já selecionado, faz Enter e aguarda o intervalo escolhido. **PAUSAR** interrompe imediatamente após a operação atual. **CANCELAR** interrompe e guarda o progresso para continuar do próximo código, sem limpar a rota. Fechar o teclado, trocar de campo/aplicativo ou voltar à aba da câmera pausa o reenvio; ele nunca recomeça sozinho. Se a rota concluir, a execução não reinicia nem duplica automaticamente; para uma nova execução, importe outra cópia da planilha. A memória do progresso persiste no armazenamento privado do aplicativo.
+## Testes e compilação
+GitHub Actions no branch `feature/v1-5-importar-br-excel` executa testes automáticos: ler XLSX exportado por este app, XLSX com strings compartilhadas, listas de texto e rejeitar XML potencialmente malicioso. A compilação gera `app-debug.apk` no artefato `LeitorRastreiosBR-debug`.
 
-O indicador de progresso mostra **quantos códigos receberam Enter pelo teclado**, não quantas baixas foram confirmadas pelo aplicativo de destino. Android InputMethodService e InputConnection não oferecem confirmação da baixa. Se o aplicativo receptor perde o foco após um Enter, a operação pausa. **Nunca use em campos de senha.**
-
-**Limitações:** a importação aparece no seletor nativo Android e pode ocultar temporariamente o teclado; após escolher o arquivo, retorne ao campo original. A leitura de `.xls` antigo não é suportada. Arquivos grandes são recusados por segurança. A sessão de baixa do aplicativo receptor precisa ser testada manualmente para determinar o intervalo adequado. Caso uma digitação parcial falhe, revise o campo antes de retomar. Os dados locais podem ser apagados se o aplicativo for desinstalado.
-
-**Código:** branch `feature/v1-4-reenvio-excel` no GitHub. **APK:** abra a execução bem-sucedida do GitHub Actions e baixe o artefato `LeitorRastreiosBR-debug`, contendo o arquivo `app-debug.apk`. Esta é uma versão de depuração para testes, não assinatura estável de loja.
+A importação foi corrigida no código e verificada pelos testes automatizados, mas deve ser validada no Android com uma planilha real do usuário.
