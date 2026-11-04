@@ -132,7 +132,7 @@ class ReplayPanel(
         }
         codeList=LinearLayout(service).apply { orientation=LinearLayout.VERTICAL }
         scroll.addView(codeList)
-        put(view,scroll,90)
+        put(view,scroll,75)
 
         state=text("Aguardando",12f,blue)
         put(view,state,29)
