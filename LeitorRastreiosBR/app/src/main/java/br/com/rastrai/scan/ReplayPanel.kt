@@ -213,14 +213,9 @@ class ReplayPanel(
         val editor=service.currentInputEditorInfo ?: return false
         if(!service.isInputViewShown || service.currentInputConnection==null ||
             service.isSecretField()) return false
-        if(editor.packageName != hostPackage) return false
-        if(hostField>0 && editor.fieldId>0 && editor.fieldId!=hostField) return false
-        if((editor.inputType and InputType.TYPE_MASK_CLASS) !=
-            (hostInputType and InputType.TYPE_MASK_CLASS)) return false
-        if((editor.inputType and InputType.TYPE_MASK_VARIATION) !=
-            (hostInputType and InputType.TYPE_MASK_VARIATION)) return false
-        val hint=editor.hintText?.toString().orEmpty()
-        if(hostHint.isNotBlank() && hint.isNotBlank() && hostHint!=hint) return false
+        if(!ReplayResumePolicy.sameField(hostPackage,hostField,hostInputType,hostHint,
+                editor.packageName.orEmpty(),editor.fieldId,editor.inputType,
+                editor.hintText?.toString().orEmpty())) return false
         val variation=editor.inputType and InputType.TYPE_MASK_VARIATION
         if(variation==InputType.TYPE_TEXT_VARIATION_URI ||
             variation==InputType.TYPE_TEXT_VARIATION_WEB_EDIT_TEXT &&
@@ -271,8 +266,9 @@ class ReplayPanel(
         val version=++generation
         ReplayRoutes.saveRunState(service,"Retomando após Enter e retorno do teclado")
         // Cumpre o intervalo desde o Enter anterior, mesmo se a janela se ocultou.
-        val remaining=(lastEnterAt+ReplayRoutes.intervalMillis(service)-System.currentTimeMillis()).coerceAtLeast(0)
-        handler.postDelayed({ sendNext(version) },remaining.coerceAtLeast(300))
+        val remaining=ReplayResumePolicy.remainingDelay(lastEnterAt,
+            ReplayRoutes.intervalMillis(service),System.currentTimeMillis())
+        handler.postDelayed({ sendNext(version) },remaining)
         state.text="Campo recuperado • continuando automaticamente"
     }
     /** Ao sumir o teclado, mantém a intenção; NÃO reenvia sem verificar o campo. */
