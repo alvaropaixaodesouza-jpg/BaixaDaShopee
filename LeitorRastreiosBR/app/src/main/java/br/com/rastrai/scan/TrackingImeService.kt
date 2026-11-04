@@ -43,8 +43,6 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -69,14 +67,12 @@ class TrackingImeService : InputMethodService() {
             Barcode.FORMAT_CODABAR
         ).build()
     )
-    private val textReader = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     private var provider: ProcessCameraProvider? = null
     private var camera: Camera? = null
     private var previewCase: Preview? = null
     private var analysisCase: ImageAnalysis? = null
     private var previewView: PreviewView? = null
     private var zoomLabel: TextView? = null
-    private var lastOcrAt = 0L
     private lateinit var pinch: ScaleGestureDetector
     private var status: TextView? = null
     private var history: LinearLayout? = null
@@ -197,7 +193,7 @@ class TrackingImeService : InputMethodService() {
             marginEnd = d(6)
         })
         val right = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; background=card(Color.WHITE,12);setPadding(d(6),d(6),d(4),d(4)) }
-        right.addView(label("CÓDIGO  |  NOME",11f).apply {setTypeface(null,Typeface.BOLD)})
+        right.addView(label("CÓDIGOS BR",11f).apply {setTypeface(null,Typeface.BOLD)})
         val scroll = ScrollView(this)
         history = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
         scroll.addView(history)
@@ -322,9 +318,8 @@ class TrackingImeService : InputMethodService() {
             container.addView(label("Ainda sem rastreios.",10f))
         } else {
             records.takeLast(6).asReversed().forEach { r ->
-                val short = r.firstName.ifBlank { "Nome pendente" }
-                val l=label("✓ " + r.code + " | " + short,10f)
-                l.maxLines=3
+                val l=label("✓ " + r.code,11f)
+                l.maxLines=2
                 l.setPadding(0,d(4),0,d(4))
                 container.addView(l)
             }
@@ -369,64 +364,29 @@ class TrackingImeService : InputMethodService() {
 
     @OptIn(ExperimentalGetImage::class)
     private fun detect(proxy: ImageProxy) {
-        if (!active || !enabled || !busy.compareAndSet(false,true)) {
+        if(!active || !enabled || !busy.compareAndSet(false, true)) {
             proxy.close()
             return
         }
-        val media=proxy.image
-        if(media==null) { busy.set(false);proxy.close();return }
-        val input=InputImage.fromMediaImage(media,proxy.imageInfo.rotationDegrees)
-        val finished=AtomicBoolean(false)
-        fun closeFrame() {
-            if(finished.compareAndSet(false,true)) {
-                proxy.close()
-                busy.set(false)
-            }
-        }
+        val source=proxy.image
+        if(source==null) { busy.set(false);proxy.close();return }
+        val input=InputImage.fromMediaImage(source,proxy.imageInfo.rotationDegrees)
         try {
             mlkit.process(input)
                 .addOnSuccessListener { barcodes ->
+                    if(!active || !enabled) return@addOnSuccessListener
                     val found=barcodes.firstNotNullOfOrNull { b ->
                         b.rawValue?.let { raw ->
-                            TrackingParser.parse(raw,Store.strict(this))?.let { Pair(it,b.format) }
+                            TrackingParser.parse(raw,true)?.let { Pair(it,b.format) }
                         }
                     }
-                    if(!active || !enabled || found==null) {
-                        closeFrame()
-                        return@addOnSuccessListener
-                    }
-                    val (code,format)=found
-                    // Primeiro registra o rastreio e envia Enter sem depender do OCR.
-                    accept(code,format)
-                    val record=Store.list(this).find { it.code == code }
-                    val now=System.currentTimeMillis()
-                    val missing=record != null && (record.name.isBlank() || record.street.isBlank() ||
-                        record.district.isBlank() || record.zip.isBlank())
-                    if(!missing || now-lastOcrAt<850) {
-                        closeFrame()
-                        return@addOnSuccessListener
-                    }
-                    lastOcrAt=now
-                    // Usa a mesma imagem do código; evita vincular dados de outro pacote.
-                    textReader.process(input)
-                        .addOnSuccessListener { result ->
-                            if(active && enabled) {
-                                val info=RecipientOcr.parse(result.text)
-                                if(Store.updateRecipient(this,code,info)) {
-                                    render()
-                                    if(info.firstName.isNotBlank())
-                                        setStatus("Nome identificado: " + info.firstName + " • " + code)
-                                }
-                            }
-                        }
-                        .addOnCompleteListener { closeFrame() }
+                    if(found!=null) accept(found.first,found.second)
                 }
-                .addOnFailureListener {
-                    setStatus("Falha ao ler a etiqueta. Ajuste luz e foco.")
-                    closeFrame()
-                }
-        } catch(_:Exception) {
-            closeFrame()
+                .addOnFailureListener { setStatus("Código não legível: ajuste foco e luz.") }
+                .addOnCompleteListener { proxy.close();busy.set(false) }
+        } catch(_: Exception) {
+            proxy.close()
+            busy.set(false)
         }
     }
     private fun accept(code:String, format:Int) {
@@ -562,7 +522,6 @@ class TrackingImeService : InputMethodService() {
         owner.destroy()
         handler.removeCallbacksAndMessages(null)
         mlkit.close()
-        textReader.close()
         try { sound.release() } catch(_:Exception) {}
         worker.shutdown()
         super.onDestroy()
