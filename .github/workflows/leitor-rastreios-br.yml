@@ -8,6 +8,9 @@ on:
       - '.github/workflows/leitor-rastreios-br.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -40,3 +43,18 @@ jobs:
           name: LeitorRastreiosBR-debug
           path: LeitorRastreiosBR/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+      - name: Disponibilizar APK para download direto no GitHub
+        if: github.ref == 'refs/heads/feature/v1-7-quebra-linha-reenvio'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk ./RastreiosBR-v1.7-instalar.apk
+          TAG="leitor-rastreios-br-v1.7.0"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" ./RastreiosBR-v1.7-instalar.apk --clobber
+          else
+            gh release create "$TAG" ./RastreiosBR-v1.7-instalar.apk \
+              --target "$GITHUB_SHA" --title "Leitor de Rastreios BR v1.7 (APK)" \
+              --notes "APK Android para instalação: câmera no teclado, importação de Excel e reenvio com quebra de linha. Compilação debug para teste." \
+              --prerelease
+          fi
