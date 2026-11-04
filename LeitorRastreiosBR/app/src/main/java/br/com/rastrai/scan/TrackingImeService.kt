@@ -19,6 +19,7 @@ import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
+import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputMethodManager
 import android.view.KeyEvent
 import android.widget.Button
@@ -113,6 +114,7 @@ class TrackingImeService : InputMethodService() {
         setOnClickListener { onClick() }
     }
     override fun onCreateInputView(): View {
+        activePage=getSharedPreferences("ime_ui",MODE_PRIVATE).getInt("page",0).coerceIn(0,1)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setPadding(d(7),d(5),d(7),d(8))
             setBackgroundColor(bg)
@@ -135,8 +137,13 @@ class TrackingImeService : InputMethodService() {
                 // commitText vazio SUBSTITUI o trecho selecionado (inclusive Selecionar tudo).
                 val selected=runCatching { ic.getSelectedText(0)?.toString().orEmpty() }
                     .getOrDefault("")
+                val extractedSelection=runCatching {
+                    val request=ExtractedTextRequest().apply { token=1 }
+                    ic.getExtractedText(request,0)?.let { it.selectionStart >= 0 &&
+                        it.selectionEnd > it.selectionStart } ?: false
+                }.getOrDefault(false)
                 val erased=try {
-                    if(selected.isNotEmpty()) ic.commitText("",1)
+                    if(selected.isNotEmpty() || extractedSelection) ic.commitText("",1)
                     else ic.deleteSurroundingText(1,0)
                 } catch(_:Exception) { false }
                 if(!erased) {
@@ -252,6 +259,7 @@ class TrackingImeService : InputMethodService() {
     private fun showPage(page:Int) {
         if(page==activePage) return
         activePage=page
+        getSharedPreferences("ime_ui",MODE_PRIVATE).edit().putInt("page",page).apply()
         scanPage?.visibility=if(page==0) View.VISIBLE else View.GONE
         replayPanel?.view?.visibility=if(page==1) View.VISIBLE else View.GONE
         if(page==1) {
