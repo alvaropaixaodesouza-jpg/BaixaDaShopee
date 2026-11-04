@@ -13,6 +13,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.TextView
 import java.util.Locale
 
@@ -30,6 +31,7 @@ class ReplayPanel(
     private lateinit var seconds: TextView
     private lateinit var progressText: TextView
     private lateinit var currentCode: TextView
+    private lateinit var codeList: LinearLayout
     private lateinit var state: TextView
     private lateinit var progress: ProgressBar
     private var running=false
@@ -93,6 +95,14 @@ class ReplayPanel(
         put(view,progress,18)
         currentCode=text("Importe um arquivo para começar",12f)
         put(view,currentCode,25)
+        val listScroll=ScrollView(service).apply {
+            background=background(Color.WHITE)
+            setPadding(dp(7),dp(4),dp(7),dp(4))
+            isVerticalScrollBarEnabled=true
+        }
+        codeList=LinearLayout(service).apply { orientation=LinearLayout.VERTICAL }
+        listScroll.addView(codeList)
+        put(view,listScroll,90)
         state=text("Aguardando",12f,blue)
         put(view,state,29)
 
@@ -144,6 +154,25 @@ class ReplayPanel(
             if(it.remaining==0) "Rota concluída. Importe outro arquivo para uma nova execução."
             else "Próximo: "+it.codes[it.nextIndex]+"  •  restam "+it.remaining
         } ?: "Selecione uma planilha Excel do celular"
+        codeList.removeAllViews()
+        if(route==null) codeList.addView(text("Nenhum BR carregado",12f))
+        else {
+            // Lista do Excel: mostra somente códigos, nunca nomes/endereço.
+            val begin=(route.nextIndex-2).coerceAtLeast(0)
+            val end=(begin+25).coerceAtMost(route.codes.size)
+            for(index in begin until end) {
+                val marker=when {
+                    index<route.nextIndex -> "✓"
+                    index==route.nextIndex -> "▶"
+                    else -> "•"
+                }
+                val color=if(index==route.nextIndex) blue else ink
+                codeList.addView(text(marker+" "+(index+1)+". "+route.codes[index],12f,color).apply {
+                    setPadding(0,dp(4),0,dp(4))
+                    if(index==route.nextIndex) setTypeface(null,Typeface.BOLD)
+                })
+            }
+        }
         if(!running) state.text=ReplayRoutes.runState(service)
     }
     fun onInputReady() {
