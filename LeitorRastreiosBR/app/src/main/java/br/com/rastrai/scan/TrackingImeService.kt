@@ -156,8 +156,12 @@ class TrackingImeService : InputMethodService() {
             setTextColor(Color.rgb(155,30,30))
         }
         val enterKey=button("↵ ENTER") {
-            if(currentInputConnection!=null) sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
-            else setStatus("Toque em um campo para enviar Enter")
+            val ic=currentInputConnection
+            if(ic==null) setStatus("Toque em um campo para escrever")
+            else if(getSharedPreferences("replay_typing",0).getBoolean("newline",true)) {
+                val ok=ic.commitText("\n",1)
+                if(!ok) setStatus("Este campo não aceitou a quebra de linha")
+            } else sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
         }.apply {
             background=card(Color.rgb(214,246,224),9)
             setTextColor(Color.rgb(11,109,55))
