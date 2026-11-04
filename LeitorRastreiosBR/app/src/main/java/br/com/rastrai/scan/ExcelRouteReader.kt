@@ -15,9 +15,13 @@ object ExcelRouteReader {
     fun read(input: InputStream): List<String> {
         val source=readLimited(input,MAX_FILE_BYTES)
         require(source.isNotEmpty()) { "Arquivo vazio" }
+        require(!(source.size >= 8 && source.take(8).map { it.toInt() and 255 } ==
+            listOf(208,207,17,224,161,177,26,225))) {
+            "Excel .xls antigo não é compatível: salve como .xlsx"
+        }
         val codes=if(source.size>2 && source[0].toInt()==0x50 && source[1].toInt()==0x4B)
             xlsx(source) else csv(source)
-        val cleaned=codes.mapNotNull { TrackingParser.parse(it,true) }.distinct()
+        val cleaned=codes.distinct()
         require(cleaned.isNotEmpty()) { "Nenhum código começando com BR encontrado no arquivo" }
         require(cleaned.size<=10000) { "Arquivo acima do limite de 10.000 rastreios" }
         return cleaned
@@ -90,8 +94,7 @@ object ExcelRouteReader {
                     if(kind=="s") strings.getOrNull(raw.toIntOrNull() ?: -1).orEmpty() else raw
                 }
                 if(value.isNotBlank()) {
-                    val code=TrackingParser.parse(value,true)
-                    if(code!=null) { result.add(code);break }
+                    result.addAll(TrackingParser.extractAll(value))
                 }
             }
             require(result.size<=10000) { "Mais de 10.000 rastreios nesta rota" }
@@ -104,8 +107,7 @@ object ExcelRouteReader {
         val codes=mutableListOf<String>()
         for(row in normalized.lineSequence()) {
             // Extrai apenas BR mesmo se houver nomes, endereços ou outras colunas.
-            val candidate=TrackingParser.parse(row,true)
-            if(candidate!=null) codes.add(candidate)
+            codes.addAll(TrackingParser.extractAll(row))
             require(codes.size<=10000) { "Mais de 10.000 rastreios nesta rota" }
         }
         return codes
