@@ -90,6 +90,9 @@ class TrackingImeService : InputMethodService() {
     private var enabled = true
     private var sending = false
     private var binding = false
+    private var activePage = 0
+    private var scanPage: LinearLayout? = null
+    private var replayPanel: ReplayPanel? = null
     private var lastCandidate = ""
     private var lastCandidateAt = 0L
     private var lastScannedAt = 0L
@@ -124,6 +127,29 @@ class TrackingImeService : InputMethodService() {
         count = label("",12f,blue)
         title.addView(count)
         root.addView(title)
+
+        // Controles do campo de texto: NÃO modificam a lista de pacotes.
+        val shortcuts=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
+        val backspace=button("⌫ BACKSPACE") {
+            val ic=currentInputConnection
+            if(ic==null) setStatus("Toque em um campo para apagar texto")
+            else if(!ic.deleteSurroundingText(1,0)) sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+        }.apply {
+            background=card(Color.rgb(253,225,222),9)
+            setTextColor(Color.rgb(155,30,30))
+        }
+        val enterKey=button("↵ ENTER") {
+            if(currentInputConnection!=null) sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
+            else setStatus("Toque em um campo para enviar Enter")
+        }.apply {
+            background=card(Color.rgb(214,246,224),9)
+            setTextColor(Color.rgb(11,109,55))
+        }
+        val nextPage=button("→ ROTA") { showPage(1) }.apply { background=card(Color.WHITE,9) }
+        shortcuts.addView(backspace,LinearLayout.LayoutParams(0,d(38),1.2f).apply { rightMargin=d(4) })
+        shortcuts.addView(enterKey,LinearLayout.LayoutParams(0,d(38),1f).apply { rightMargin=d(4) })
+        shortcuts.addView(nextPage,LinearLayout.LayoutParams(0,d(38),0.8f))
+        root.addView(shortcuts,LinearLayout.LayoutParams(-1,d(40)))
 
         val main = LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
         val cameraBox = FrameLayout(this).apply { background = card(Color.BLACK,12) }
@@ -204,24 +230,61 @@ class TrackingImeService : InputMethodService() {
         save.background=card(blue,11)
         root.addView(save,LinearLayout.LayoutParams(-1,d(49)).apply { topMargin=d(4) })
         render()
-        return root
+        scanPage=root
+        val holder=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
+        holder.addView(root)
+        replayPanel=ReplayPanel(this,handler) { showPage(0) }
+        holder.addView(replayPanel!!.view)
+        root.visibility=if(activePage==0) View.VISIBLE else View.GONE
+        replayPanel!!.view.visibility=if(activePage==1) View.VISIBLE else View.GONE
+        return holder
+    }
+    private fun showPage(page:Int) {
+        if(page==activePage) return
+        activePage=page
+        scanPage?.visibility=if(page==0) View.VISIBLE else View.GONE
+        replayPanel?.view?.visibility=if(page==1) View.VISIBLE else View.GONE
+        if(page==1) {
+            active=false
+            stopCamera()
+            owner.hidden()
+            replayPanel?.refresh()
+        } else {
+            replayPanel?.onHidden()
+            active=isInputViewShown
+            if(active) {
+                owner.visible()
+                previewView?.post { startCamera() }
+            }
+        }
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info,restarting)
-        active = true
-        owner.visible()
-        previewView?.post { startCamera() }
-        handler.post { render();sendQueue() }
+        if(activePage==0) {
+            active=true
+            owner.visible()
+            previewView?.post { startCamera() }
+            handler.post { render();sendQueue() }
+        } else {
+            active=false
+            replayPanel?.onInputReady()
+        }
     }
     override fun onWindowShown() {
         super.onWindowShown()
-        active=true
-        owner.visible()
-        previewView?.post { startCamera() }
-        handler.postDelayed({ sendQueue() },250)
+        if(activePage==0) {
+            active=true
+            owner.visible()
+            previewView?.post { startCamera() }
+            handler.postDelayed({ sendQueue() },250)
+        } else {
+            active=false
+            replayPanel?.onInputReady()
+        }
     }
     override fun onWindowHidden() {
+        replayPanel?.onHidden()
         active=false
         stopCamera()
         owner.hidden()
@@ -230,6 +293,7 @@ class TrackingImeService : InputMethodService() {
         super.onWindowHidden()
     }
     override fun onFinishInputView(finishingInput:Boolean) {
+        replayPanel?.onHidden()
         active=false
         stopCamera()
         owner.hidden()
@@ -390,6 +454,7 @@ class TrackingImeService : InputMethodService() {
         render()
         sendQueue()
     }
+    fun isSecretField(): Boolean = passwordField()
     private fun passwordField():Boolean {
         val type=currentInputEditorInfo?.inputType ?: 0
         val v=type and InputType.TYPE_MASK_VARIATION
@@ -491,6 +556,7 @@ class TrackingImeService : InputMethodService() {
             .putExtra("session",Store.active(this)))
     }
     override fun onDestroy() {
+        replayPanel?.onDestroyed()
         active=false
         stopCamera()
         owner.destroy()
