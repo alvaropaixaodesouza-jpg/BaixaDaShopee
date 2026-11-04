@@ -111,7 +111,7 @@ class ScanActivity : ComponentActivity() {
         val input=InputImage.fromMediaImage(image,proxy.imageInfo.rotationDegrees)
         scanner.process(input).addOnSuccessListener { barcodes ->
             val code=barcodes.firstNotNullOfOrNull { b ->
-                b.rawValue?.let { raw -> TrackingParser.parse(raw,Store.strict(this))?.let { Pair(it,b.format) } }
+                b.rawValue?.let { raw -> TrackingParser.parse(raw,true)?.let { Pair(it,b.format) } }
             }
             if(code!=null) runOnUiThread { accept(code.first,code.second) }
             else if(barcodes.isNotEmpty()) runOnUiThread { status.text="Etiqueta lida, mas não corresponde ao filtro BR/SPXBR" }
