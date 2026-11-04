@@ -128,8 +128,22 @@ class TrackingImeService : InputMethodService() {
         val shortcuts=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
         val backspace=button("⌫ BACKSPACE") {
             val ic=currentInputConnection
-            if(ic==null) setStatus("Toque em um campo para apagar texto")
-            else if(!ic.deleteSurroundingText(1,0)) sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+            if(ic==null) {
+                setStatus("Toque em um campo para apagar texto")
+            } else {
+                // deleteSurroundingText(1, 0) não apaga uma seleção no WebView.
+                // commitText vazio SUBSTITUI o trecho selecionado (inclusive Selecionar tudo).
+                val selected=runCatching { ic.getSelectedText(0)?.toString().orEmpty() }
+                    .getOrDefault("")
+                val erased=try {
+                    if(selected.isNotEmpty()) ic.commitText("",1)
+                    else ic.deleteSurroundingText(1,0)
+                } catch(_:Exception) { false }
+                if(!erased) {
+                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_DEL))
+                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_DEL))
+                }
+            }
         }.apply {
             background=card(Color.rgb(253,225,222),9)
             setTextColor(Color.rgb(155,30,30))
@@ -246,7 +260,7 @@ class TrackingImeService : InputMethodService() {
             owner.hidden()
             replayPanel?.refresh()
         } else {
-            replayPanel?.onHidden()
+            replayPanel?.onLeaveReplayPage()
             active=isInputViewShown
             if(active) {
                 owner.visible()
