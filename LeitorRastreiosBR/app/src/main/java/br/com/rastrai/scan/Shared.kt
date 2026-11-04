@@ -25,7 +25,7 @@ data class Record(
 }
 
 object TrackingParser {
-    private val br = Regex("(?<![A-Z0-9])(?:SPX)?BR[A-Z0-9]{8,32}(?![A-Z0-9])")
+    private val br = Regex("(?<![A-Z0-9])BR[A-Z0-9]{8,32}(?![A-Z0-9])")
     private val generic = Regex("^[A-Z0-9][A-Z0-9_-]{5,59}$")
     fun parse(raw: String, strict: Boolean): String? {
         val normalized = raw.uppercase(Locale.ROOT).trim()
@@ -163,25 +163,15 @@ object Excel {
 </Relationships>""")
             fun cell(pos: String, value: String): String =
                 "<c r=\"" + pos + "\" t=\"inlineStr\"><is><t>" + esc(value) + "</t></is></c>"
+            val codes = rows.mapNotNull { TrackingParser.parse(it.code, true) }.distinct()
             val sheetRows = buildString {
                 append("<row r=\"1\">")
-                listOf("Nº", "Código de rastreio", "Data e hora", "Tipo", "Destinatário", "Primeiro nome", "Rua / Endereço", "Bairro", "CEP").forEachIndexed { i,v ->
-                    append(cell(('A' + i).toString() + "1",v))
-                }
+                append(cell("A1", "Código BR"))
                 append("</row>")
-                val fmt = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale("pt","BR"))
-                rows.forEachIndexed { i,r ->
+                codes.forEachIndexed { i, code ->
                     val n = (i + 2).toString()
                     append("<row r=\"" + n + "\">")
-                    append(cell("A" + n,(i+1).toString()))
-                    append(cell("B" + n,r.code))
-                    append(cell("C" + n,fmt.format(Date(r.at))))
-                    append(cell("D" + n,r.kind))
-                    append(cell("E" + n,r.name))
-                    append(cell("F" + n,r.firstName))
-                    append(cell("G" + n,r.street))
-                    append(cell("H" + n,r.district))
-                    append(cell("I" + n,r.zip))
+                    append(cell("A" + n, code))
                     append("</row>")
                 }
             }
