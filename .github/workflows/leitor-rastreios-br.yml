@@ -1,8 +1,8 @@
-name: Leitor Rastreios BR APK v1.6 (Reenvio Estavel)
+name: Leitor Rastreios BR APK v1.7 (Quebra de Linha)
 on:
   push:
     branches:
-      - feature/v1-6-continuidade-teclado
+      - feature/v1-7-quebra-linha-reenvio
     paths:
       - 'LeitorRastreiosBR/**'
       - '.github/workflows/leitor-rastreios-br.yml'
