@@ -1,0 +1,39 @@
+name: Disponibilizar APK v1.7 para download direto
+on:
+  push:
+    branches:
+      - feature/v1-7-quebra-linha-reenvio
+    paths:
+      - '.github/workflows/publicar-apk-direto.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar APK já compilado
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p apk
+          gh run download 41853266596 --repo "$GITHUB_REPOSITORY" --name LeitorRastreiosBR-debug --dir apk
+          test -s apk/app-debug.apk
+          mv apk/app-debug.apk RastreiosBR-v1.7-instalar.apk
+      - name: Publicar APK como download direto
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="leitor-rastreios-br-v1.7.0"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" RastreiosBR-v1.7-instalar.apk --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" RastreiosBR-v1.7-instalar.apk \
+              --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "Leitor Rastreios BR v1.7 - APK" \
+              --notes "APK v1.7 compilado e testado. Câmera no teclado, rotas Excel, quebra de linha e Enter do aplicativo." \
+              --prerelease
+          fi
