@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets
 import java.util.zip.ZipInputStream
 import javax.xml.parsers.DocumentBuilderFactory
 
-/** Lê a primeira aba de um XLSX real ou CSV sem dependências externas. */
+/** Importa apenas códigos BR da primeira aba de Excel .xlsx ou de texto/CSV. */
 object ExcelRouteReader {
     private const val MAX_FILE_BYTES=12*1024*1024
     private const val MAX_XML_BYTES=22*1024*1024
@@ -18,7 +18,7 @@ object ExcelRouteReader {
         val codes=if(source.size>2 && source[0].toInt()==0x50 && source[1].toInt()==0x4B)
             xlsx(source) else csv(source)
         val cleaned=codes.mapNotNull { TrackingParser.parse(it,true) }.distinct()
-        require(cleaned.isNotEmpty()) { "Nenhum rastreio BR/SPXBR encontrado" }
+        require(cleaned.isNotEmpty()) { "Nenhum código começando com BR encontrado no arquivo" }
         require(cleaned.size<=10000) { "Arquivo acima do limite de 10.000 rastreios" }
         return cleaned
     }
@@ -35,15 +35,18 @@ object ExcelRouteReader {
         return bytes.toByteArray()
     }
     private fun xml(bytes: ByteArray): org.w3c.dom.Document {
-        val f=DocumentBuilderFactory.newInstance()
-        f.isNamespaceAware=true
-        f.isXIncludeAware=false
-        f.isExpandEntityReferences=false
-        f.setFeature("http://apache.org/xml/features/disallow-doctype-decl",true)
-        f.setFeature("http://xml.org/sax/features/external-general-entities",false)
-        f.setFeature("http://xml.org/sax/features/external-parameter-entities",false)
-        f.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd",false)
-        return f.newDocumentBuilder().parse(ByteArrayInputStream(bytes))
+        // O parser DOM do Android não aceita várias features específicas do Java SE.
+        // Em vez de chamar setFeature (que gerava "parser does not support specification"),
+        // bloqueamos DOCTYPE/ENTITY antes de criar o documento.
+        require(bytes.none { it == 0.toByte() }) { "XML com codificação incompatível" }
+        val content = String(bytes, StandardCharsets.UTF_8)
+        require(!Regex("<!\\s*(?:DOCTYPE|ENTITY)\\b", RegexOption.IGNORE_CASE).containsMatchIn(content)) {
+            "Planilha contém XML não permitido"
+        }
+        val factory=DocumentBuilderFactory.newInstance()
+        factory.isNamespaceAware=true
+        // Não solicitar recursos de parser que algumas versões do Android desconhecem.
+        return factory.newDocumentBuilder().parse(ByteArrayInputStream(bytes))
     }
     private fun Element.all(tag:String): List<Element> {
         val list=getElementsByTagNameNS("*",tag)
@@ -100,7 +103,7 @@ object ExcelRouteReader {
         val normalized=source.replace("\r\n","\n")
         val codes=mutableListOf<String>()
         for(row in normalized.lineSequence()) {
-            // Cobre os formatos ; , e tab, e colunas entre aspas.
+            // Extrai apenas BR mesmo se houver nomes, endereços ou outras colunas.
             val candidate=TrackingParser.parse(row,true)
             if(candidate!=null) codes.add(candidate)
             require(codes.size<=10000) { "Mais de 10.000 rastreios nesta rota" }
