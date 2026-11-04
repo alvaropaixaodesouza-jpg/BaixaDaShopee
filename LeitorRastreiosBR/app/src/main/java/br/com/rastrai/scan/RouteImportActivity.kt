@@ -27,7 +27,7 @@ class RouteImportActivity : ComponentActivity() {
             }
             runOnUiThread {
                 result.onSuccess { route ->
-                    toast("Rota importada: "+route.codes.size+" códigos. "+route.title)
+                    toast("Rota importada: "+route.codes.size+" códigos BR. "+route.title)
                 }.onFailure { ex ->
                     toast("Não foi possível importar: "+(ex.message ?: "arquivo inválido"))
                 }
@@ -39,7 +39,7 @@ class RouteImportActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         if(savedInstanceState==null) picker.launch(arrayOf(
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "text/csv", "application/octet-stream"
+            "text/csv", "text/plain", "application/octet-stream"
         ))
     }
     private fun displayName(uri:Uri):String {
